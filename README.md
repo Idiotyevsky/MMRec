@@ -147,11 +147,12 @@ train   : i1 i2 i3 i4 i5        (autoregressive shift inside this window)
 val     : i6                    test: i7
 ```
 
-Full ranking over all 19 738 items. Candidate dot-products are computed in item
-chunks, while the batch-level full score matrix is retained for exact ranking —
-no candidate pre-filtering, no approximate top-k. The user's own history is
-masked, the ground truth never is. Metrics: `Recall@{5,10,20}`,
-`NDCG@{5,10,20}`, plus `MRR@20` and `Coverage@20`.
+Full ranking over the entire catalogue (its size is in the generated dataset
+table). Candidate dot-products are computed in item chunks, while the
+batch-level full score matrix is retained for exact ranking — no candidate
+pre-filtering, no approximate top-k. The user's own history is masked, the
+ground truth never is. Metrics: `Recall@{5,10,20}`, `NDCG@{5,10,20}`, plus
+`MRR@20` and `Coverage@20`.
 
 **Validation is used for early stopping and is therefore optimistically biased.**
 Test numbers are reported from the best checkpoint and are the only ones used for
@@ -162,8 +163,8 @@ that produced the overall numbers, so the tables cannot contradict each other.
 
 ## Results
 
-MicroLens-100K, full ranking over all 19 738 items, test split, mean ± std over
-seeds where more than one seed finished. `TBD` means the run has not finished —
+MicroLens-100K, full ranking over the whole catalogue, test split, mean ± std
+over seeds where more than one seed finished. `TBD` means the run has not finished —
 **no number in this repository is estimated or filled in by hand**. Tables are
 regenerated from `results/tables/*.csv` by `python analysis/update_readme.py`.
 
@@ -219,9 +220,10 @@ The per-bucket breakdown of both is in the gain table below.
 
 ### Cold-item evaluation
 
-Simulated cold split: 10 % of items (1 974) have **every training interaction
-removed**; they keep their content features and their ID representation is zeroed
-at inference for every model. 25 345 evaluation targets are cold.
+Simulated cold split: a fixed share of items (counts in the generated dataset
+table) have **every training interaction removed**; they keep their content
+features and their ID representation is zeroed at inference for every model, so
+the collaborative signal for them is gone by construction.
 
 `Cold *` = full ranking over all items for users whose target is cold.
 `ColdOnly *` = ranking restricted to the cold catalogue (a sharper measure of
@@ -236,9 +238,9 @@ much the multimodal model recovers is read off it (and off the generated finding
 below), not remembered here. What the comparison is designed to test is that
 content features can do something the collaborative signal structurally cannot.
 
-Ranks use the **average-rank tie policy**: with an optimistic policy the 1 974
-cold items all tied at score 0 would each be reported as a perfect hit, which
-would be a measurement artefact rather than a result.
+Ranks use the **average-rank tie policy**: with an optimistic policy every cold
+item tied at score 0 would be reported as a perfect hit, which would be a
+measurement artefact rather than a result.
 
 ### Long-tail analysis
 

@@ -128,6 +128,11 @@ SASRec+item-dropout 0.2 `0.1283 ± 0.0009` < MM-SASRec gated+ID-dropout 0.2
   tail (e.g. gated+ID-dropout: image 0.016 head → 0.029 tail, text 0.017 → 0.033).
 - `analysis/update_readme.py --check` passes, i.e. every generated README number
   matches `results/tables/*.csv` byte for byte.
+- **The uniform-Random cold floor agrees with its closed form**: with 1 974 cold
+  candidates the predicted cold-only Recall@20 is `20/1974 = 0.01013`; measured
+  on the cold10 split over 12 717 users with a cold target: `0.00967` (0.5
+  standard errors away, `se = 0.00089`). The cold evaluation path is unbiased,
+  which is what makes the cold *model* numbers interpretable.
 
 ## Known issues / deferred (in priority order)
 
