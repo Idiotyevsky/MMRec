@@ -127,6 +127,41 @@ def test_identity_fields_are_not_averaged(tables):
     assert merged[0]["Recall@20"] == "0.1250 ± 0.0071"
 
 
+ABLATION_FIELDS = [
+    "model", "dataset", "modalities", "ID", "Text", "Image", "Video", "Fusion",
+    "item_dropout", "id_dropout", "modality_dropout", "Recall@20", "NDCG@20",
+    "Recall@10", "NDCG@10", "params", "seed", "tag", "run_id",
+]
+
+
+def _ablation_row(tag, dataset, model, recall20):
+    return {
+        "tag": tag, "dataset": dataset, "model": model, "modalities": "id",
+        "ID": "1", "Text": "0", "Image": "0", "Video": "0", "Fusion": "-",
+        "id_dropout": "0.0", "item_dropout": "0.0", "modality_dropout": "0.0",
+        "Recall@20": recall20, "NDCG@20": "0.0550", "Recall@10": "0.0850",
+        "NDCG@10": "0.0450", "params": "2929792", "seed": "42",
+        "run_id": f"{tag}_20260101-000000_abc123",
+    }
+
+
+def test_cold_split_runs_stay_out_of_the_headline_tables(tables):
+    """The cold10 split is a different protocol; its rows must not appear as
+    a second, unexplained "ID-only" row in the overall or ablation table."""
+    cold = _overall_row("cold_sasrec", "sasrec", 42, "0.9999", "0.9999")
+    cold["dataset"] = "cold10"
+    _write(tables, "overall.csv", [
+        _overall_row("sasrec", "sasrec", 42, "0.1200", "0.0550"),
+        cold,
+    ], OVERALL_FIELDS)
+    _write(tables, "ablation.csv", [
+        _ablation_row("sasrec", "base", "sasrec", "0.1200"),
+        _ablation_row("cold_sasrec", "cold10", "sasrec", "0.9999"),
+    ], ABLATION_FIELDS)
+    assert "0.9999" not in mrt.overall_table()
+    assert "0.9999" not in mrt.ablation_table()
+
+
 def test_gates_table_is_empty_without_a_documented_export(tables):
     _write(tables, "gate_by_bucket.csv", [], ["model", "run", "bucket", "modality", "mean_gate"])
     assert "TBD" in mrt.gates_table()

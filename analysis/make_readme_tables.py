@@ -125,6 +125,9 @@ def overall_table() -> str:
     rows = group_seeds(read("overall.csv"))
     if not rows:
         return f"_No finished runs yet — {TBD}._"
+    # the cold split removes training interactions, so its absolute numbers are
+    # a different protocol and must not sit silently next to base-split rows
+    rows = [r for r in rows if r.get("dataset", "base") == "base"]
     order = {"popular": 0, "bpr": 1, "sasrec": 2, "mm_sasrec": 3}
     rows.sort(key=lambda r: (order.get(r["model"], 9), str(r.get("dataset", "")), str(r.get("tag"))))
     body = [[label(r), fmt(r.get("Recall@10")), fmt(r.get("Recall@20")),
@@ -139,6 +142,9 @@ def ablation_table() -> str:
     rows = group_seeds(read("ablation.csv"))
     if not rows:
         return f"_No ablation runs finished yet — {TBD}._"
+    # cold10 runs share model/modalities with base runs, so an unfiltered table
+    # would show two "ID-only" rows with different numbers and no way to tell them apart
+    rows = [r for r in rows if r.get("dataset", "base") == "base"]
     rows.sort(key=lambda r: (str(r.get("dataset", "")), r.get("model") != "sasrec",
                              int(r["ID"]), int(r["Text"]), int(r["Image"]), int(r["Video"]),
                              str(r.get("Fusion")), float(r.get("id_dropout") or 0)))
