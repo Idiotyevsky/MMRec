@@ -18,6 +18,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 TABLES = ROOT / "results" / "tables"
+SEMANTIC_ID_REPORT = ROOT / "artifacts" / "semantic_id_report_content.json"
 TBD = "TBD"
 
 
@@ -299,6 +300,38 @@ def dataset_table() -> str:
     return md_table(["split", "users", "items", "interactions", "sparsity",
                      "mean seq len", "train interactions", "median train item freq",
                      "items with 0 train freq", "cold items"], rows)
+
+
+def semantic_id_table() -> str:
+    """Semantic-ID quantiser summary, read from the committed artifact.
+
+    The README's Semantic-ID block used to be hand-copied, which is what this
+    generator exists to prevent.  Nothing here depends on a recommender
+    checkpoint; ``source features`` is rendered from the artifact so a table
+    built from different features cannot keep the text+image wording.
+    """
+    if not SEMANTIC_ID_REPORT.exists():
+        return f"_No Semantic-ID report committed — {TBD}._"
+    try:
+        r = json.loads(SEMANTIC_ID_REPORT.read_text(encoding="utf-8"))
+    except Exception:
+        return f"_Semantic-ID report unreadable — {TBD}._"
+    util = r.get("codebook_utilization") or []
+    rows = [
+        ["source features", f"`{r.get('source', TBD)}`"],
+        ["quantiser", f"RQVAE, {r.get('num_levels', TBD)} levels × "
+                      f"{r.get('codebook_size', TBD)} codes, latent {r.get('latent_dim', TBD)} "
+                      f"({_spaced(r.get('params'))} params)"],
+        ["reconstruction cosine", f"{float(r['reconstruction_cosine']):.3f}"
+                                  if r.get("reconstruction_cosine") is not None else TBD],
+        ["codebook utilisation", "`[" + ", ".join(f"{float(u):.1f}" for u in util) + "]`"
+                                 if util else TBD],
+        ["unique Semantic IDs", f"{_spaced(r.get('unique_semantic_ids'))} / "
+                                f"{_spaced(r.get('num_items'))} items"],
+        ["collision rate", f"**{100 * float(r['collision_rate']):.3f} %**"
+                           if r.get("collision_rate") is not None else TBD],
+    ]
+    return md_table(["", ""], rows)
 
 
 def gates_table() -> str:
@@ -668,6 +701,7 @@ def main() -> None:
         "GATES": gates_table(),
         "EFFICIENCY": efficiency_table(),
         "DATASET": dataset_table(),
+        "SEMANTICID": semantic_id_table(),
     }
     text = "\n\n".join(f"<!-- {k} -->\n{v}" for k, v in sections.items())
     if args.out:

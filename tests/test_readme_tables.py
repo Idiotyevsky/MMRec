@@ -7,6 +7,7 @@ as a remembered number.
 """
 
 import csv
+import json
 
 import pytest
 
@@ -393,3 +394,29 @@ def test_efficiency_table_ignores_ablation_and_cold_runs(tables):
     text = mrt.efficiency_table()
     assert "999999" not in text and "999" not in text
     assert "300" in text and "100" in text
+
+
+def test_semantic_id_table_is_generated_from_the_artifact(tmp_path, monkeypatch):
+    """The block used to be hand-copied; the values must come from the report."""
+    report = tmp_path / "semantic_id_report_content.json"
+    report.write_text(json.dumps({
+        "source": "fake features",
+        "num_levels": 3, "codebook_size": 64, "latent_dim": 32, "params": 12345,
+        "reconstruction_cosine": 0.5, "codebook_utilization": [1.0, 0.5, 1.0],
+        "num_items": 100, "unique_semantic_ids": 42, "collision_rate": 0.005,
+    }), encoding="utf-8")
+    monkeypatch.setattr(mrt, "SEMANTIC_ID_REPORT", report)
+
+    text = mrt.semantic_id_table()
+    assert "0.500" in text and "**0.500 %**" in text
+    assert "42 / 100 items" in text
+    assert "RQVAE, 3 levels × 64 codes, latent 32 (12 345 params)" in text
+    assert "`[1.0, 0.5, 1.0]`" in text
+    assert "`fake features`" in text
+    assert "TBD" not in text
+    assert "0.681" not in text  # the committed report's value must not leak in
+
+
+def test_semantic_id_table_is_tbd_without_the_report(tmp_path, monkeypatch):
+    monkeypatch.setattr(mrt, "SEMANTIC_ID_REPORT", tmp_path / "missing.json")
+    assert "TBD" in mrt.semantic_id_table()

@@ -400,19 +400,22 @@ Retrieval uses `faiss.IndexFlatIP` over L2-normalised embeddings (cosine), with 
 Content embeddings are quantised into Semantic IDs with an RQVAE, and a small
 causal Transformer generates the next item's ID instead of scoring vectors.
 
-**Status: paused** while the discriminative results stabilise. The numbers below
-quantise the raw per-modality-normalised text+image features and are recorded in
-`artifacts/semantic_id_report_content.json`; they do not depend on any
+**Status: paused** while the discriminative results stabilise. The table below is
+generated from the committed `artifacts/semantic_id_report_content.json` (raw
+per-modality-normalised text+image features), so no number here depends on a
 recommender checkpoint. (`artifacts/semantic_id_report_fused.json` does — it was
 built from a pre-fix run's fused embeddings and is legacy.)
 
-| | |
+<!-- TABLE:SEMANTICID -->
+|  |  |
 |---|---|
-| quantiser | RQVAE, 4 levels × 256 codes, latent 64 |
-| reconstruction cosine | 0.681 (`artifacts/semantic_id_report_content.json`) |
+| source features | `text+image(L2-normalised per modality)` |
+| quantiser | RQVAE, 4 levels × 256 codes, latent 64 (1 471 168 params) |
+| reconstruction cosine | 0.681 |
 | codebook utilisation | `[1.0, 1.0, 1.0, 1.0]` |
 | unique Semantic IDs | 19 692 / 19 738 items |
 | collision rate | **0.233 %** |
+<!-- /TABLE:SEMANTICID -->
 
 Getting there required fixing three things that are easy to get wrong, all
 documented in the code:

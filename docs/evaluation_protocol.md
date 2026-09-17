@@ -186,3 +186,42 @@ Reported per bucket: `Recall@20`, `NDCG@20`, and the gain
 | tiny overfit | SASRec must reach < 0.15 loss on 20 synthetic users |
 | gate weights | must sum to 1 over available modalities, exactly 0 for missing |
 | cold ID | cold items must have zero ID gate weight |
+
+## 9. Aggregation: when two runs may be averaged
+
+A table cell that says `0.1224 ± 0.0020` is a claim that its runs are replicates
+of one experiment. `analysis/aggregate_results.py` only makes that claim when the
+runs agree on all of:
+
+* **code identity** — see below;
+* `dataset_hash` (the split, item mapping and cold mask actually used);
+* the config with `training.seed` removed — replicates are *supposed* to differ
+  in that one key and nothing else;
+* `num_parameters`.
+
+Runs without a `run_manifest.json` never contribute, and the largest mutually
+compatible subset is kept: the odd run out is excluded and printed, not averaged
+in with a warning nobody reads (this is how a seed-3407 run that had 128 extra
+parameters was caught).
+
+Code identity is decided in three steps, most specific first:
+
+1. a run whose `git_dirty` is not exactly `false` (edited tree, or a status check
+   that could not run) is compared only with itself — its code is not the
+   commit's code, so no commit-level claim applies to it;
+2. a commit listed in `analysis/code_equivalence.json` takes that class's
+   identity. The file is a *declaration*, not an inference: per class it names a
+   reference commit, the commits, why the diff between them cannot change a
+   number, and which files that diff touches. The aggregator prints the class id
+   and reason whenever it actually pools more than one commit;
+3. otherwise the SHA-256 of `git ls-tree -r <sha> -- src scripts configs
+   pyproject.toml` — the code itself, so a commit that only touches the README,
+   a test or a table is not treated as a different implementation. The class
+   index is closed over that hash, so an undeclared commit whose
+   result-determining tree equals a class member's joins the class: a
+   declaration can only widen comparability, never narrow it below what the tree
+   hash already proves.
+
+`tests/test_aggregation_guard.py` pins each step against the real repository,
+including that a class's commits differ from its reference in no file the class
+does not declare.
