@@ -37,6 +37,11 @@ def fmt(v, digits: int = 4) -> str:
     except (TypeError, ValueError):
         return str(v)
 
+def is_base(row: dict) -> bool:
+    """Rows of the base split; a missing/empty dataset column means base."""
+    return (row.get("dataset") or "base") == "base"
+
+
 
 def label(row: dict) -> str:
     ds = row.get("dataset", "")
@@ -127,7 +132,7 @@ def overall_table() -> str:
         return f"_No finished runs yet — {TBD}._"
     # the cold split removes training interactions, so its absolute numbers are
     # a different protocol and must not sit silently next to base-split rows
-    rows = [r for r in rows if r.get("dataset", "base") == "base"]
+    rows = [r for r in rows if is_base(r)]
     order = {"popular": 0, "bpr": 1, "sasrec": 2, "mm_sasrec": 3}
     rows.sort(key=lambda r: (order.get(r["model"], 9), str(r.get("dataset", "")), str(r.get("tag"))))
     body = [[label(r), fmt(r.get("Recall@10")), fmt(r.get("Recall@20")),
@@ -144,7 +149,7 @@ def ablation_table() -> str:
         return f"_No ablation runs finished yet — {TBD}._"
     # cold10 runs share model/modalities with base runs, so an unfiltered table
     # would show two "ID-only" rows with different numbers and no way to tell them apart
-    rows = [r for r in rows if r.get("dataset", "base") == "base"]
+    rows = [r for r in rows if is_base(r)]
     rows.sort(key=lambda r: (str(r.get("dataset", "")), r.get("model") != "sasrec",
                              int(r["ID"]), int(r["Text"]), int(r["Image"]), int(r["Video"]),
                              str(r.get("Fusion")), float(r.get("id_dropout") or 0)))
@@ -181,6 +186,9 @@ def long_tail_table() -> str:
     rows = group_seeds(read("long_tail.csv"))
     if not rows:
         return f"_No long-tail runs finished yet — {TBD}._"
+    # same protocol rule as the overall table: the cold split's bucket numbers
+    # come from a different catalogue and are reported in the cold table
+    rows = [r for r in rows if is_base(r)]
     body = [[label(r), fmt(r.get("head_Recall@20")), fmt(r.get("middle_Recall@20")),
              fmt(r.get("tail_Recall@20")), fmt(r.get("head_NDCG@20")),
              fmt(r.get("middle_NDCG@20")), fmt(r.get("tail_NDCG@20"))]
@@ -206,7 +214,7 @@ def gain_table() -> str:
     rows = group_seeds(read("long_tail.csv"))
     if not rows:
         return f"_No long-tail runs yet — {TBD}._"
-    base_rows = [r for r in rows if r.get("dataset", "base") == "base"]
+    base_rows = [r for r in rows if is_base(r)]
     id_row = next((r for r in base_rows if r.get("model") == "sasrec"
                    and float(r.get("item_dropout") or 0) == 0), None)
     reg_row = next((r for r in base_rows if r.get("model") == "sasrec"
@@ -311,6 +319,9 @@ def efficiency_table() -> str:
     idx = read("runs_index.csv")
     if not idx:
         return f"_No finished runs yet — {TBD}._"
+    # the row must describe the headline base-split pair, not whichever
+    # ablation or cold variant happens to sort first
+    idx = [r for r in idx if is_base(r)]
 
     def pick(**want):
         for r in idx:
@@ -319,8 +330,9 @@ def efficiency_table() -> str:
         return None
 
     id_run = pick(model="sasrec", item_dropout="0.0")
-    mm_run = pick(model="mm_sasrec", fusion="gated", id_dropout="0.2") or pick(
-        model="mm_sasrec", fusion="gated")
+    mm_run = pick(model="mm_sasrec", fusion="gated", modalities="id+text+image",
+                  id_dropout="0.2") or pick(
+        model="mm_sasrec", fusion="gated", modalities="id+text+image")
 
     def _mean(runs, key) -> float | None:
         vals = [float(r[key]) for r in runs if r.get(key) not in (None, "", "None")]
@@ -332,8 +344,9 @@ def efficiency_table() -> str:
         return _mean(rs, "params")
 
     p_id = _params(model="sasrec", item_dropout="0.0")
-    p_mm = _params(model="mm_sasrec", fusion="gated", id_dropout="0.2") or _params(
-        model="mm_sasrec", fusion="gated")
+    p_mm = _params(model="mm_sasrec", fusion="gated", modalities="id+text+image",
+                   id_dropout="0.2") or _params(
+        model="mm_sasrec", fusion="gated", modalities="id+text+image")
 
     def s(v, digits=0):
         return TBD if v is None else (f"{v:,.{digits}f}".replace(",", " ") if digits == 0
@@ -346,9 +359,9 @@ def efficiency_table() -> str:
         return t / e if t and e else None
 
     id_grp = [r for r in idx if r.get("model") == "sasrec" and str(r.get("item_dropout")) == "0.0"]
-    mm_grp = [r for r in idx if r.get("model") == "mm_sasrec" and r.get("fusion") == "gated"
-              and str(r.get("id_dropout")) == "0.2"] or [
-        r for r in idx if r.get("model") == "mm_sasrec" and r.get("fusion") == "gated"]
+    _mm_gated = [r for r in idx if r.get("model") == "mm_sasrec" and r.get("fusion") == "gated"
+                 and r.get("modalities") == "id+text+image"]
+    mm_grp = [r for r in _mm_gated if str(r.get("id_dropout")) == "0.2"] or _mm_gated
 
     delta = "—"
     if p_id and p_mm:
@@ -467,7 +480,7 @@ def findings() -> str:
     if not overall:
         return f"_No finished runs yet — {TBD}._"
 
-    base = [r for r in overall if r.get("dataset", "base") == "base"]
+    base = [r for r in overall if is_base(r)]
     pop = _pick(base, model="popular")
     bpr = _pick(base, model="bpr")
     # the modality set is part of the identity: without it, an ablation row
@@ -533,7 +546,7 @@ def findings() -> str:
             f"concat {_gain(_num(mm_concat, 'Recall@20'), _num(idonly, 'Recall@20'))}."
         )
 
-    base_lt = [r for r in long_tail if r.get("dataset", "base") == "base"]
+    base_lt = [r for r in long_tail if is_base(r)]
     id_lt = next((r for r in base_lt if r.get("model") == "sasrec"
                   and float(r.get("item_dropout") or 0) == 0), None)
     mm_lt = next((r for r in base_lt if r.get("model") == "mm_sasrec"

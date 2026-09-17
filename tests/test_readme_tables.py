@@ -216,8 +216,19 @@ def test_cold_split_runs_stay_out_of_the_headline_tables(tables):
         _ablation_row("sasrec", "base", "sasrec", "0.1200"),
         _ablation_row("cold_sasrec", "cold10", "sasrec", "0.9999"),
     ], ABLATION_FIELDS)
+    buckets = {"bucket_rule": "frequency_quantile", "num_users": "100"}
+    for name in ("head", "middle", "tail"):
+        buckets[f"{name}_Recall@20"] = "0.9999"
+        buckets[f"{name}_NDCG@20"] = "0.1"
+    lt = dict(_ablation_row("cold_sasrec", "cold10", "sasrec", "0.9999"), **buckets)
+    base_lt = dict(lt, tag="sasrec", dataset="base",
+                   **{f"{n}_Recall@20": "0.1000" for n in ("head", "middle", "tail")})
+    _write(tables, "long_tail.csv", [base_lt, lt], LONGTAIL_FIELDS)
+
     assert "0.9999" not in mrt.overall_table()
     assert "0.9999" not in mrt.ablation_table()
+    assert "0.9999" not in mrt.long_tail_table()
+    assert "0.1000" in mrt.long_tail_table()
 
 
 def test_gates_table_is_empty_without_a_documented_export(tables):
@@ -239,7 +250,7 @@ def test_gates_table_averages_documented_runs(tables):
 
 
 RUNS_INDEX_FIELDS = [
-    "run_id", "tag", "model", "fusion", "modalities", "seed", "id_dropout",
+    "run_id", "tag", "model", "dataset", "fusion", "modalities", "seed", "id_dropout",
     "item_dropout", "params", "git_sha", "git_dirty", "dataset_hash", "config_hash",
     "best_epoch", "epochs", "train_time_s", "provenance",
 ]
@@ -265,3 +276,31 @@ def test_efficiency_table_names_its_runs(tables):
     assert "+200.0 %" in text
     assert "5.0 / 10.0 s" in text  # 50 s over 10 epochs, 80 s over 8 epochs
     assert "runs behind these numbers" in text
+
+
+def test_efficiency_table_ignores_ablation_and_cold_runs(tables):
+    """Regression: the pickers matched model/fusion/dropout, so a cold or
+    ablation row sorted first would supply the headline params and timings."""
+    def row(tag, model, dataset, modalities, id_dropout, item_dropout, params,
+            epochs, train_time_s):
+        return {
+            "run_id": f"{tag}_20260101-000000_aaa", "tag": tag, "model": model,
+            "dataset": dataset, "fusion": "gated" if model == "mm_sasrec" else "-",
+            "modalities": modalities, "seed": "42", "id_dropout": id_dropout,
+            "item_dropout": item_dropout, "params": params, "best_epoch": "1",
+            "epochs": epochs, "train_time_s": train_time_s, "git_sha": "x",
+            "git_dirty": "False", "dataset_hash": "d", "config_hash": "c",
+            "provenance": "True",
+        }
+    _write(tables, "runs_index.csv", [
+        # these sort first and previously matched the headline criteria
+        row("cold_sasrec", "sasrec", "cold10", "id", "0.0", "0.0", "999999", "999", "9990.0"),
+        row("ab_id_text", "mm_sasrec", "base", "id+text", "0.2", "0.0", "999999", "999",
+            "9990.0"),
+        row("sasrec", "sasrec", "base", "id", "0.0", "0.0", "100", "10", "50.0"),
+        row("mm_gated_iddrop", "mm_sasrec", "base", "id+text+image", "0.2", "0.0",
+            "300", "8", "80.0"),
+    ], RUNS_INDEX_FIELDS)
+    text = mrt.efficiency_table()
+    assert "999999" not in text and "999" not in text
+    assert "300" in text and "100" in text

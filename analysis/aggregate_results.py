@@ -187,6 +187,7 @@ def build_runs_index(runs: list[dict]) -> list[dict]:
             "run_id": r["run_id"],
             "tag": r["tag"],
             "model": r["model"],
+            "dataset": r["dataset"],
             "fusion": r["fusion"],
             "modalities": r["modalities"],
             "seed": r["seed"],
