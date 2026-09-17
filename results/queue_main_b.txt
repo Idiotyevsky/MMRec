@@ -1,0 +1,5 @@
+# Phase 6-8 main matrix, part B: D SASRec + item-dropout 0.2 (ID-only control).
+# Separates "content helps" from "dropout regularises" against C.
+sasrec_itemdrop|configs/sasrec_itemdrop.yaml|
+sasrec_itemdrop_s2026|configs/sasrec_itemdrop.yaml|--seed@2026
+sasrec_itemdrop_s3407|configs/sasrec_itemdrop.yaml|--seed@3407

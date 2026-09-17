@@ -16,6 +16,13 @@ import numpy as np
 
 ROOT = Path(__file__).resolve().parents[2]
 
+# Only these paths can change what a training run computes.  Everything else in
+# the tree is either not part of a run (analysis scripts, tests, docs) or is
+# written *by* runs (results/tables, results/manifests, per-run logs, queue
+# files).  Counting those would mark every run after the first in a queue as
+# dirty -- and a flag that is always dirty cannot be used to reject anything.
+RESULT_DETERMINING_PATHS = ("src", "scripts", "configs", "pyproject.toml")
+
 
 def _git(*args: str) -> str | None:
     try:
@@ -29,15 +36,41 @@ def _git(*args: str) -> str | None:
     return out.stdout.strip()
 
 
+def _status_paths(paths: tuple[str, ...]) -> list[str]:
+    """Paths that differ from HEAD, using NUL-separated output.
+
+    ``--porcelain -z`` is used because the human format starts with a status
+    column whose leading space a plain ``.strip()`` would eat, shifting every
+    path by one character.
+    """
+    try:
+        out = subprocess.run(
+            ["git", "status", "--porcelain", "-z", "--", *paths],
+            cwd=ROOT, capture_output=True, timeout=10,
+        )
+    except Exception:
+        return []
+    if out.returncode != 0:
+        return []
+    entries = out.stdout.decode("utf-8", "replace").split("\0")
+    return [e[3:] for e in entries if len(e) > 3]
+
+
 def git_state() -> dict:
-    """``git_sha`` plus whether the working tree was dirty when the run started."""
+    """``git_sha`` plus whether result-determining files differed from HEAD.
+
+    ``git_dirty`` answers "could this number have been produced by code that is
+    not in HEAD?" -- so it only looks at ``RESULT_DETERMINING_PATHS``, and
+    ``git_dirty_files`` lists what was modified.
+    """
     sha = _git("rev-parse", "HEAD")
     if sha is None:
         return {"git_sha": None, "git_dirty": None, "git_branch": None, "git_available": False}
-    status = _git("status", "--porcelain")
+    dirty_files = _status_paths(RESULT_DETERMINING_PATHS)
     return {
         "git_sha": sha,
-        "git_dirty": bool(status),
+        "git_dirty": bool(dirty_files),
+        "git_dirty_files": dirty_files[:20],
         "git_branch": _git("rev-parse", "--abbrev-ref", "HEAD"),
         "git_available": True,
     }

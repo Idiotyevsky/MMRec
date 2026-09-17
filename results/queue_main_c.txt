@@ -1,0 +1,4 @@
+# Phase 6-8 main matrix, part C: E MM-SASRec gated (ID+Text+Image), no ID dropout.
+mm_gated|configs/mm_sasrec_gated.yaml|
+mm_gated_s2026|configs/mm_sasrec_gated.yaml|--seed@2026
+mm_gated_s3407|configs/mm_sasrec_gated.yaml|--seed@3407

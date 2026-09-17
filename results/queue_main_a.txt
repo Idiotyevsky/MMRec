@@ -1,0 +1,7 @@
+# Phase 6-8 main matrix, part A: the baselines whose ordering must hold.
+# A Popular (reference) < B BPR-MF < C SASRec, all on data/processed/base.
+popular|configs/popular.yaml|
+bpr|configs/bpr.yaml|
+sasrec|configs/sasrec.yaml|
+sasrec_s2026|configs/sasrec.yaml|--seed@2026
+sasrec_s3407|configs/sasrec.yaml|--seed@3407
