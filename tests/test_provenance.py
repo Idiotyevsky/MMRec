@@ -8,6 +8,12 @@ import pytest
 from src.data.dataset import ProcessedData
 from src.utils import provenance
 
+# these tests ask questions *about* the checkout; an exported source tree
+# (git archive, tarball) has no .git and would fail for the wrong reason
+needs_git = pytest.mark.skipif(
+    not (provenance.ROOT / ".git").exists(), reason="needs a git checkout"
+)
+
 
 def test_config_hash_is_order_insensitive_and_content_sensitive():
     a = {"model": {"hidden_size": 128}, "training": {"seed": 42}}
@@ -35,6 +41,7 @@ def test_dataset_fingerprint_changes_with_the_split(synthetic_dir, tmp_path):
     assert provenance.dataset_fingerprint(ProcessedData.load(other)) != before
 
 
+@needs_git
 def test_dirty_flag_ignores_generated_artifacts():
     """A queue that writes manifests or tables must not dirty the next run."""
     scratch = provenance.ROOT / "results" / "logs" / "__provenance_probe__"
@@ -48,6 +55,7 @@ def test_dirty_flag_ignores_generated_artifacts():
     assert after["git_dirty"] == before["git_dirty"]
 
 
+@needs_git
 def test_dirty_flag_catches_a_modified_source_file():
     probe = provenance.ROOT / "scripts" / "__provenance_probe__.py"
     probe.write_text("# x\n", encoding="utf-8")
