@@ -12,6 +12,7 @@ ab_video_only,mm_sasrec,base,gated,video,42,0.0,0.0,frequency_quantile,33521,0.2
 mm_concat,mm_sasrec,base,concat,id+text+image,42,0.0,0.0,frequency_quantile,33521,0.213538,0.100587,21904,0.131392,0.05848,44575,0.08673,0.035974,mm_concat_20260917-075552_b84b95
 mm_concat_iddrop,mm_sasrec,base,concat,id+text+image,42,0.2,0.0,frequency_quantile,33521,0.219743,0.102865,21904,0.138514,0.061548,44575,0.089355,0.03679,mm_concat_iddrop_20260917-082810_d41504
 mm_concat_s2026,mm_sasrec,base,concat,id+text+image,2026,0.0,0.0,frequency_quantile,33521,0.213001,0.100211,21904,0.134587,0.059408,44575,0.086887,0.035858,mm_concat_s2026_20260917-131630_b6acd8
+mm_concat_s3407,mm_sasrec,base,concat,id+text+image,3407,0.0,0.0,frequency_quantile,33521,0.216819,0.10159,21904,0.132944,0.0591,44575,0.083814,0.034597,mm_concat_s3407_20260917-134354_c04efb
 mm_gated,mm_sasrec,base,gated,id+text+image,42,0.0,0.0,frequency_quantile,33521,0.215447,0.100994,21904,0.120982,0.052914,44575,0.063915,0.024783,mm_gated_20260917-053644_dfe900
 mm_gated_iddrop,mm_sasrec,base,gated,id+text+image,42,0.2,0.0,frequency_quantile,33521,0.204767,0.096634,21904,0.1271,0.056474,44575,0.077757,0.030924,mm_gated_iddrop_20260917-053644_ec427f
 mm_gated_iddrop_s2026,mm_sasrec,base,gated,id+text+image,2026,0.2,0.0,frequency_quantile,33521,0.203604,0.097592,21904,0.131392,0.05757,44575,0.079035,0.031855,mm_gated_iddrop_s2026_20260917-060143_87b54b

@@ -203,6 +203,29 @@ def test_the_equivalence_file_is_self_consistent_and_every_commit_exists():
             )
 
 
+def test_a_class_diff_touches_no_file_outside_its_declared_list():
+    """The machine-checkable half of "this diff cannot change a number".
+
+    The reason text is a human judgement; the file list is not.  Whatever the
+    class claims its commits touch, the real diff against the reference must
+    stay inside it -- so a commit that quietly reaches some other file can
+    never be excused by the class's prose.
+    """
+    paths = agg.RESULT_DETERMINING_PATHS
+    for cls in _declared_classes():
+        touched: set[str] = set()
+        for sha in cls["commits"]:
+            out = _git("diff", "--name-only", cls["reference"], _rev(sha), "--", *paths)
+            assert out.returncode == 0, f"{cls['id']}: git diff failed for {sha}"
+            touched.update(out.stdout.split())
+        allowed = set(cls.get("touches") or [])
+        assert touched <= allowed, (
+            f"{cls['id']}: commits differ from the reference in {sorted(touched - allowed)}, "
+            f"which the class does not declare"
+        )
+        assert touched, f"{cls['id']}: no listed commit differs from the reference at all"
+
+
 def test_a_declared_equivalence_class_pools_its_commits_end_to_end(tmp_path, monkeypatch, capsys):
     """The 28 runs behind the tables span nine commits; they must still pool."""
     cls = _declared_classes()[0]

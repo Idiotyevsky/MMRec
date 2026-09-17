@@ -3,6 +3,7 @@ mm_sasrec,base,id+text+image+video,1,1,1,1,gated,0.0,0.0,0.0,0.12707,0.057398,0.
 mm_sasrec,base,id+text+image,1,1,1,0,concat,0.0,0.0,0.0,0.13902,0.062563,0.09585,0.0517,3212288,42,mm_concat,mm_concat_20260917-075552_b84b95
 mm_sasrec,base,id+text+image,1,1,1,0,concat,0.0,0.2,0.0,0.14383,0.064362,0.09922,0.05313,3212288,42,mm_concat_iddrop,mm_concat_iddrop_20260917-082810_d41504
 mm_sasrec,base,id+text+image,1,1,1,0,concat,0.0,0.0,0.0,0.13961,0.062588,0.09584,0.051596,3212288,2026,mm_concat_s2026,mm_concat_s2026_20260917-131630_b6acd8
+mm_sasrec,base,id+text+image,1,1,1,0,concat,0.0,0.0,0.0,0.13916,0.062421,0.09622,0.05161,3212288,3407,mm_concat_s3407,mm_concat_s3407_20260917-134354_c04efb
 mm_sasrec,base,id+text+image,1,1,1,0,gated,0.0,0.0,0.0,0.12721,0.056491,0.08641,0.046219,3179395,42,mm_gated,mm_gated_20260917-053644_dfe900
 mm_sasrec,base,id+text+image,1,1,1,0,gated,0.0,0.2,0.0,0.13114,0.058547,0.08891,0.047924,3179395,42,mm_gated_iddrop,mm_gated_iddrop_20260917-053644_ec427f
 mm_sasrec,base,id+text+image,1,1,1,0,gated,0.0,0.2,0.0,0.13226,0.059523,0.0905,0.049015,3179395,2026,mm_gated_iddrop_s2026,mm_gated_iddrop_s2026_20260917-060143_87b54b
