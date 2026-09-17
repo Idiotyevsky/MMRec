@@ -291,15 +291,21 @@ that carry a `run_manifest.json` contribute; the plain-gated and ID-dropout
 variants are kept in separate rows because they answer different questions.
 
 <!-- TABLE:GATES -->
-_Mean over 7 documented run(s), from `results/tables/gate_by_bucket.csv`._
+_Mean over 9 documented run(s), from `results/tables/gate_by_bucket.csv`._
 
 | Model | Modality | Head | Middle | Tail |
 |---|---|---|---|---|
+| mm_sasrec(id+image) | id | 0.988 | 0.989 | 0.984 |
+| mm_sasrec(id+image) | image | 0.012 | 0.011 | 0.016 |
 | mm_sasrec(id+text) | id | 0.977 | 0.981 | 0.974 |
 | mm_sasrec(id+text) | text | 0.023 | 0.019 | 0.026 |
 | mm_sasrec(id+text+image) | id | 0.964 | 0.965 | 0.954 |
 | mm_sasrec(id+text+image) | image | 0.013 | 0.013 | 0.019 |
 | mm_sasrec(id+text+image) | text | 0.024 | 0.022 | 0.027 |
+| mm_sasrec(id+text+image+video) | id | 0.960 | 0.959 | 0.944 |
+| mm_sasrec(id+text+image+video) | image | 0.012 | 0.012 | 0.017 |
+| mm_sasrec(id+text+image+video) | text | 0.021 | 0.020 | 0.024 |
+| mm_sasrec(id+text+image+video) | video | 0.007 | 0.009 | 0.015 |
 | mm_sasrec_iddrop(id+text+image) | id | 0.967 | 0.961 | 0.939 |
 | mm_sasrec_iddrop(id+text+image) | image | 0.016 | 0.019 | 0.029 |
 | mm_sasrec_iddrop(id+text+image) | text | 0.017 | 0.020 | 0.033 |
