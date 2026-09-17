@@ -576,9 +576,12 @@ def findings() -> str:
     if cold:
         rand = _pick(cold, model="random")
         cold_id = _pick(cold, model="sasrec")
+        # the content-only row is the direct answer to "can content stand in";
+        # the gated row is the headline model with its cold ID zeroed
+        cold_content = _pick(cold, model="mm_sasrec", modalities="text+image")
         cold_mm = (_pick(cold, model="mm_sasrec", modalities="id+text+image", id_dropout=0.2)
                    or _pick(cold, model="mm_sasrec", modalities="id+text+image"))
-        n_cold = _num(cold_mm or cold_id or rand, "num_cold_items")
+        n_cold = _num(cold_mm or cold_content or cold_id or rand, "num_cold_items")
         chance = f"20/{int(n_cold)} = {20 / n_cold:.4f}" if n_cold else TBD
         line(
             "**Cold items** (cold catalogue = "
@@ -586,7 +589,9 @@ def findings() -> str:
             f"cold target): cold-only Recall@20 — theoretical uniform ranker {chance}"
             + (f", measured Random {_num(rand, 'ColdOnly Recall@20'):.4f}" if rand else "")
             + (f", SASRec ID-only {_num(cold_id, 'ColdOnly Recall@20'):.4f}" if cold_id else "")
-            + (f", MM-SASRec {_num(cold_mm, 'ColdOnly Recall@20'):.4f}" if cold_mm else "")
+            + (f", content-only MM-SASRec {_num(cold_content, 'ColdOnly Recall@20'):.4f}"
+               if cold_content else "")
+            + (f", gated MM-SASRec {_num(cold_mm, 'ColdOnly Recall@20'):.4f}" if cold_mm else "")
             + "."
         )
 

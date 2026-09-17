@@ -246,9 +246,9 @@ much the multimodal model recovers is read off it (and off the generated finding
 below), not remembered here. What the comparison is designed to test is that
 content features can do something the collaborative signal structurally cannot.
 
-Ranks use the **average-rank tie policy**: with an optimistic policy every cold
-item tied at score 0 would be reported as a perfect hit, which would be a
-measurement artefact rather than a result.
+Ranks use the **tie-neutral midpoint policy** (`docs/evaluation_protocol.md`):
+with an optimistic policy every cold item tied at score 0 would be reported as a
+perfect hit, which would be a measurement artefact rather than a result.
 
 ### Long-tail analysis
 

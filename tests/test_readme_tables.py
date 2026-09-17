@@ -231,6 +231,44 @@ def test_cold_split_runs_stay_out_of_the_headline_tables(tables):
     assert "0.1000" in mrt.long_tail_table()
 
 
+COLD_FIELDS = [
+    "tag", "model", "dataset", "fusion", "modalities", "id_dropout", "seed",
+    "num_cold_items", "num_users", "Cold Recall@10", "Cold Recall@20",
+    "Cold NDCG@10", "Cold NDCG@20", "ColdOnly Recall@10", "ColdOnly Recall@20",
+    "ColdOnly NDCG@20", "run_id",
+]
+
+
+def _cold_row(tag, model, modalities, id_dropout, cold_only_recall20):
+    return {
+        "tag": tag, "model": model, "dataset": "cold10", "fusion": "gated",
+        "modalities": modalities, "id_dropout": id_dropout, "seed": "42",
+        "num_cold_items": "1974", "num_users": "12717",
+        "ColdOnly Recall@20": cold_only_recall20,
+        "run_id": f"{tag}_20260101-000000_abc123",
+    }
+
+
+def test_cold_claim_names_the_content_only_and_gated_rows_separately(tables):
+    """The cold question is whether content stands in, so the content-only and
+    the gated (cold-ID-zeroed) numbers are different answers, not one number."""
+    _write(tables, "overall.csv", [
+        _overall_row("popular", "popular", 42, "0.0036", "0.0014"),
+        _overall_row("bpr", "bpr", 42, "0.0334", "0.0131"),
+        _overall_row("sasrec", "sasrec", 42, "0.1224", "0.0557"),
+    ], OVERALL_FIELDS)
+    _write(tables, "cold_start.csv", [
+        _cold_row("cold_random", "random", "id", "0.0", "0.0097"),
+        _cold_row("cold_sasrec", "sasrec", "id", "0.0", "0.0000"),
+        _cold_row("cold_content_only", "mm_sasrec", "text+image", "0.0", "0.0123"),
+        _cold_row("cold_mm_gated_iddrop", "mm_sasrec", "id+text+image", "0.2", "0.0456"),
+    ], COLD_FIELDS)
+    text = mrt.findings()
+    assert "content-only MM-SASRec 0.0123" in text
+    assert "gated MM-SASRec 0.0456" in text
+    assert "20/1974 = 0.0101" in text
+
+
 def test_gates_table_is_empty_without_a_documented_export(tables):
     _write(tables, "gate_by_bucket.csv", [], ["model", "run", "bucket", "modality", "mean_gate"])
     assert "TBD" in mrt.gates_table()
