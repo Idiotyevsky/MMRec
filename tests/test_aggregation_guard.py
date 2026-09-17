@@ -1,0 +1,244 @@
+"""The aggregation gate: no run enters a table without agreeing provenance.
+
+These tests exist because of a real incident: SASRec seed 42 and seed 3407 were
+once aggregated as replicates although their parameter counts differed by 128
+(one config had allocated an optional regulariser), and seed aggregates were
+printed as if they were the same experiment.
+"""
+
+from __future__ import annotations
+
+import json
+import sys
+from pathlib import Path
+
+import pytest
+import yaml
+
+from analysis import aggregate_results as agg
+
+
+def _config(seed: int = 42, **training) -> dict:
+    t = {"seed": seed, "batch_size": 512, "learning_rate": 0.001}
+    t.update(training)
+    return {
+        "model": {"name": "sasrec", "hidden_size": 128, "num_layers": 2,
+                  "item_dropout_prob": 0.0, "id_dropout_prob": 0.0,
+                  "modality_dropout_prob": 0.0},
+        "data": {"processed_dir": "data/processed/base"},
+        "training": t,
+        "evaluation": {"ks": [5, 10, 20]},
+    }
+
+
+def _make_run(root: Path, name: str, *, seed: int = 42, params: int = 100,
+              provenance: bool = True, git_sha: str = "a" * 40,
+              dataset_hash: str = "b" * 32, recall20: float = 0.08,
+              best_epoch: int = 12, config: dict | None = None) -> Path:
+    d = root / name
+    d.mkdir(parents=True, exist_ok=True)
+    cfg = config if config is not None else _config(seed=seed)
+    (d / "config.yaml").write_text(yaml.safe_dump(cfg), encoding="utf-8")
+    metrics = {
+        "run_id": name,
+        "model": cfg["model"]["name"],
+        "seed": seed,
+        "train": {"num_parameters": params, "best_epoch": best_epoch},
+        "val": {"NDCG@10": recall20 / 2},
+        "test": {"Recall@20": recall20, "NDCG@20": recall20 / 2, "Recall@10": recall20 / 2},
+    }
+    (d / "metrics.json").write_text(json.dumps(metrics), encoding="utf-8")
+    (d / "train_summary.json").write_text(json.dumps({"num_parameters": params}), encoding="utf-8")
+    if provenance:
+        (d / "run_manifest.json").write_text(json.dumps({
+            "run_id": name, "git_sha": git_sha, "git_dirty": False,
+            "dataset_hash": dataset_hash, "config_hash": "c" * 16,
+            "num_parameters": params, "seed": seed,
+        }), encoding="utf-8")
+    return d
+
+
+def _signature_of(runs, name):
+    return next(agg._signature(r) for r in runs if r["run_id"].startswith(name))
+
+
+# --------------------------------------------------------------------------- #
+# group key
+# --------------------------------------------------------------------------- #
+
+def test_group_key_strips_the_seed_suffix_of_the_same_seed():
+    assert agg._group_key({"tag": "sasrec_s2026", "seed": 2026}) == "sasrec"
+    assert agg._group_key({"tag": "mm_gated_s3407", "seed": 3407}) == "mm_gated"
+
+
+def test_group_key_keeps_a_tag_that_only_looks_like_a_seed_suffix():
+    # `_s2026` is a seed suffix only when the run really was seed 2026
+    assert agg._group_key({"tag": "sasrec_s2026", "seed": 42}) == "sasrec_s2026"
+    assert agg._group_key({"tag": "cold_mm_gated", "seed": 42}) == "cold_mm_gated"
+
+
+# --------------------------------------------------------------------------- #
+# config hash
+# --------------------------------------------------------------------------- #
+
+def test_config_core_hash_ignores_only_the_seed():
+    base = _config(seed=42)
+    assert agg._config_core_hash(base) == agg._config_core_hash(_config(seed=3407))
+
+    other = _config(seed=42, batch_size=256)
+    assert agg._config_core_hash(base) != agg._config_core_hash(other)
+
+
+def test_config_core_hash_is_order_insensitive():
+    a = _config(seed=42)
+    b = {k: a[k] for k in reversed(list(a))}
+    assert agg._config_core_hash(a) == agg._config_core_hash(b)
+
+
+# --------------------------------------------------------------------------- #
+# the gate itself
+# --------------------------------------------------------------------------- #
+
+def test_seeds_of_one_experiment_are_grouped_and_kept(tmp_path):
+    runs = []
+    for tag, seed in (("sasrec", 42), ("sasrec_s2026", 2026), ("sasrec_s3407", 3407)):
+        _make_run(tmp_path, f"{tag}_20260917-000000_aaaaaa", seed=seed)
+    loaded = agg.load_runs(tmp_path)
+    assert len(loaded) == 3
+    kept = agg._enforce_compatibility(loaded, allow_mixed=False)
+    assert len(kept) == 3
+
+
+def test_the_128_parameter_mismatch_is_excluded_not_averaged(tmp_path, capsys):
+    """The incident that motivated the gate, reproduced on disk."""
+    _make_run(tmp_path, "sasrec_20260917-000000_aaaaaa", seed=42, params=2929792)
+    _make_run(tmp_path, "sasrec_s2026_20260917-000000_bbbbbb", seed=2026, params=2929792)
+    _make_run(tmp_path, "sasrec_s3407_20260917-000000_cccccc", seed=3407, params=2929920)
+
+    loaded = agg.load_runs(tmp_path)
+    kept = agg._enforce_compatibility(loaded, allow_mixed=False)
+    ids = sorted(r["run_id"] for r in kept)
+    assert len(kept) == 2, "the odd parameter count must not be pooled with the others"
+    assert not any("s3407" in i for i in ids)
+
+    out = capsys.readouterr().out
+    assert "mixes 2 incompatible provenances" in out
+    assert "excluded sasrec_s3407_20260917-000000_cccccc" in out
+
+
+def test_allow_mixed_keeps_everything_with_a_warning(tmp_path, capsys):
+    _make_run(tmp_path, "sasrec_20260917-000000_aaaaaa", seed=42, params=100)
+    _make_run(tmp_path, "sasrec_s2026_20260917-000000_bbbbbb", seed=2026, params=228)
+    loaded = agg.load_runs(tmp_path)
+    kept = agg._enforce_compatibility(loaded, allow_mixed=True)
+    assert len(kept) == 2
+    assert "--allow-mixed" in capsys.readouterr().out
+
+
+def test_different_datasets_are_not_pooled(tmp_path):
+    _make_run(tmp_path, "sasrec_20260917-000000_aaaaaa", seed=42, dataset_hash="b" * 32)
+    _make_run(tmp_path, "sasrec_s2026_20260917-000000_bbbbbb", seed=2026, dataset_hash="e" * 32)
+    kept = agg._enforce_compatibility(agg.load_runs(tmp_path), allow_mixed=False)
+    assert len(kept) == 1
+
+
+def test_different_code_versions_are_not_pooled(tmp_path):
+    _make_run(tmp_path, "sasrec_20260917-000000_aaaaaa", seed=42, git_sha="a" * 40)
+    _make_run(tmp_path, "sasrec_s2026_20260917-000000_bbbbbb", seed=2026, git_sha="f" * 40)
+    kept = agg._enforce_compatibility(agg.load_runs(tmp_path), allow_mixed=False)
+    assert len(kept) == 1
+
+
+def test_a_manifest_less_run_is_never_pooled_with_a_documented_one(tmp_path):
+    _make_run(tmp_path, "sasrec_20260917-000000_aaaaaa", seed=42, provenance=True)
+    _make_run(tmp_path, "sasrec_s2026_20260917-000000_bbbbbb", seed=2026, provenance=False)
+    loaded = agg.load_runs(tmp_path)
+    assert len(loaded) == 2
+    assert _signature_of(loaded, "sasrec_") != _signature_of(loaded, "sasrec_s2026")
+    kept = agg._enforce_compatibility(loaded, allow_mixed=False)
+    assert [r["provenance"] for r in kept] == [True]
+
+
+def test_duplicate_seed_keeps_the_longer_trained_run(tmp_path):
+    _make_run(tmp_path, "sasrec_20260917-000000_aaaaaa", seed=42, best_epoch=8)
+    _make_run(tmp_path, "sasrec_20260917-010000_bbbbbb", seed=42, best_epoch=31)
+    kept, dropped = agg._drop_duplicate_seeds(agg.load_runs(tmp_path))
+    assert len(kept) == 1
+    assert kept[0]["run_id"].endswith("bbbbbb")
+    assert dropped == ["sasrec_20260917-000000_aaaaaa"]
+
+
+# --------------------------------------------------------------------------- #
+# end to end: what actually lands in the CSV
+# --------------------------------------------------------------------------- #
+
+def _run_main(monkeypatch, runs_dir: Path, tables_dir: Path, *extra: str) -> str:
+    monkeypatch.setattr(sys, "argv", [
+        "aggregate_results.py", "--runs-dir", str(runs_dir),
+        "--tables-dir", str(tables_dir), *extra,
+    ])
+    agg.main()
+    return tables_dir
+
+
+def test_main_writes_only_documented_runs(tmp_path, monkeypatch):
+    runs, tables = tmp_path / "runs", tmp_path / "tables"
+    _make_run(runs, "sasrec_20260917-000000_aaaaaa", seed=42)
+    _make_run(runs, "sasrec_s2026_20260917-000000_bbbbbb", seed=2026, provenance=False)
+
+    _run_main(monkeypatch, runs, tables)
+
+    index = (tables / "runs_index.csv").read_text(encoding="utf-8")
+    assert "sasrec_20260917-000000_aaaaaa" in index
+    assert "sasrec_s2026_20260917-000000_bbbbbb" not in index
+    # the provenance columns are what a reviewer checks first
+    header = index.splitlines()[0]
+    for col in ("git_sha", "dataset_hash", "config_hash", "params", "seed"):
+        assert col in header
+
+
+def test_main_include_legacy_still_applies_the_provenance_gate(tmp_path, monkeypatch, capsys):
+    """Reading a legacy run and pooling it with a documented one are two gates."""
+    runs, tables = tmp_path / "runs", tmp_path / "tables"
+    _make_run(runs, "sasrec_20260917-000000_aaaaaa", seed=42)
+    _make_run(runs, "sasrec_s2026_20260917-000000_bbbbbb", seed=2026, provenance=False)
+
+    _run_main(monkeypatch, runs, tables, "--include-legacy")
+    out = capsys.readouterr().out
+    assert "of unknown provenance" in out
+    assert "mixes 2 incompatible provenances" in out
+    assert "sasrec_s2026_20260917-000000_bbbbbb" not in (
+        tables / "runs_index.csv"
+    ).read_text(encoding="utf-8")
+
+
+def test_main_include_legacy_allow_mixed_writes_everything(tmp_path, monkeypatch, capsys):
+    runs, tables = tmp_path / "runs", tmp_path / "tables"
+    _make_run(runs, "sasrec_20260917-000000_aaaaaa", seed=42)
+    _make_run(runs, "sasrec_s2026_20260917-000000_bbbbbb", seed=2026, provenance=False)
+
+    _run_main(monkeypatch, runs, tables, "--include-legacy", "--allow-mixed")
+    out = capsys.readouterr().out
+    assert "NOT valid for a result table" in out
+    index = (tables / "runs_index.csv").read_text(encoding="utf-8")
+    assert "sasrec_20260917-000000_aaaaaa" in index
+    assert "sasrec_s2026_20260917-000000_bbbbbb" in index
+
+
+def test_main_on_a_directory_without_finished_runs(tmp_path, monkeypatch):
+    runs = tmp_path / "runs"
+    runs.mkdir()
+    _run_main(monkeypatch, runs, tmp_path / "tables")
+    for name in ("overall", "ablation", "cold_start", "long_tail", "runs_index"):
+        assert (tmp_path / "tables" / f"{name}.csv").read_text(encoding="utf-8") == ""
+
+
+def test_summary_reports_std_only_for_real_replicates(tmp_path, capsys):
+    runs = []
+    for tag, seed, recall in (("sasrec", 42, 0.08), ("sasrec_s2026", 2026, 0.10)):
+        _make_run(tmp_path, f"{tag}_20260917-000000_aaaaaa", seed=seed, recall20=recall)
+    runs = agg.load_runs(tmp_path)
+    agg.print_group_summary(runs)
+    out = capsys.readouterr().out
+    assert "n=2 seeds=[42, 2026]" in out
+    assert "0.0900±0.0100" in out

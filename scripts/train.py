@@ -26,6 +26,7 @@ from src.utils.config import load_config, save_config  # noqa: E402
 from src.utils.device import env_fingerprint, get_device  # noqa: E402
 from src.utils.io import ensure_dir, run_id, save_json  # noqa: E402
 from src.utils.logging import get_logger  # noqa: E402
+from src.utils.provenance import build_manifest, save_manifest  # noqa: E402
 from src.utils.seed import set_seed  # noqa: E402
 
 
@@ -154,6 +155,26 @@ def main() -> None:
 
     save_json(results, run_dir / "metrics.json")
     save_json(results, Path("results") / "latest_metrics.json")
+
+    manifest = build_manifest(
+        cfg=cfg,
+        data=data,
+        model=model,
+        seed=seed,
+        run_id=rid,
+        tag=tag,
+        best_epoch=summary.get("best_epoch"),
+        best_metric=summary.get("best_metric"),
+        train_time_s=summary.get("train_time_s"),
+        metrics=results,
+    )
+    save_manifest(manifest, run_dir, Path("results") / "manifests")
+    logger.info(
+        f"manifest: git {str(manifest['git_sha'])[:10]}"
+        f"{' (dirty)' if manifest.get('git_dirty') else ''} "
+        f"dataset {str(manifest['dataset_hash'])[:10]} "
+        f"params {manifest['num_parameters']:,}"
+    )
     logger.info(f"done in {summary['train_time_s']:.1f}s -> {run_dir}")
 
 

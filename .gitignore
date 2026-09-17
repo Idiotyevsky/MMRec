@@ -15,6 +15,10 @@ artifacts/*.npy
 results/runs/
 results/logs/
 
+# ---- pre-fix runs and their tables: kept on disk as evidence, never aggregated ----
+results/legacy_pre_autoregressive_fix/*
+!results/legacy_pre_autoregressive_fix/README.md
+
 # ---- keep the small, human-readable evidence the README links to ----
 !results/figures/*.png
 !results/tables/*.csv

@@ -29,6 +29,7 @@ from ..models.bpr import bpr_loss
 from ..models.loss import sampled_softmax_loss
 from ..utils.device import env_fingerprint
 from ..utils.io import ensure_dir, save_json
+from ..utils.provenance import dataset_fingerprint
 from ..utils.logging import get_logger
 
 
@@ -388,13 +389,7 @@ class Trainer:
         torch.save(payload, path)
 
     def _dataset_hash(self) -> str:
-        import hashlib
-
-        h = hashlib.md5()
-        h.update(np.ascontiguousarray(self.data.train_freq).tobytes())
-        h.update(np.ascontiguousarray(self.data.is_cold.astype(np.int8)).tobytes())
-        h.update(np.ascontiguousarray(self.data.user_offsets).tobytes())
-        return h.hexdigest()
+        return dataset_fingerprint(self.data)
 
     def load_checkpoint(self, path: str | Path, load_optimizer: bool = True) -> dict:
         ckpt = torch.load(path, map_location=self.device, weights_only=False)
