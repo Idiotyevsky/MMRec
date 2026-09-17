@@ -15,6 +15,10 @@ jobs:
         python-version: ["3.10", "3.11"]
     steps:
       - uses: actions/checkout@v4
+        with:
+          # the aggregation guards check declared code-equivalence classes by
+          # resolving real commits; a depth-1 clone has none of them
+          fetch-depth: 0
 
       - uses: actions/setup-python@v5
         with:

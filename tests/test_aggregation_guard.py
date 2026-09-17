@@ -9,6 +9,7 @@ printed as if they were the same experiment.
 from __future__ import annotations
 
 import json
+import subprocess
 import sys
 from pathlib import Path
 
@@ -16,6 +17,18 @@ import pytest
 import yaml
 
 from analysis import aggregate_results as agg
+
+
+def _git(*args: str):
+    return subprocess.run(["git", *args], cwd=agg.ROOT, capture_output=True, text=True)
+
+
+def _rev(sha: str) -> str:
+    """Resolve a commit, skipping the test when this checkout does not have it."""
+    out = _git("rev-parse", "--verify", f"{sha}^{{commit}}")
+    if out.returncode != 0:
+        pytest.skip(f"commit {sha} is not in this checkout")
+    return out.stdout.strip()
 
 
 def _config(seed: int = 42, **training) -> dict:
@@ -33,6 +46,7 @@ def _config(seed: int = 42, **training) -> dict:
 
 def _make_run(root: Path, name: str, *, seed: int = 42, params: int = 100,
               provenance: bool = True, git_sha: str = "a" * 40,
+              git_dirty: bool = False,
               dataset_hash: str = "b" * 32, recall20: float = 0.08,
               best_epoch: int = 12, config: dict | None = None) -> Path:
     d = root / name
@@ -51,7 +65,7 @@ def _make_run(root: Path, name: str, *, seed: int = 42, params: int = 100,
     (d / "train_summary.json").write_text(json.dumps({"num_parameters": params}), encoding="utf-8")
     if provenance:
         (d / "run_manifest.json").write_text(json.dumps({
-            "run_id": name, "git_sha": git_sha, "git_dirty": False,
+            "run_id": name, "git_sha": git_sha, "git_dirty": git_dirty,
             "dataset_hash": dataset_hash, "config_hash": "c" * 16,
             "num_parameters": params, "seed": seed,
         }), encoding="utf-8")
@@ -147,6 +161,118 @@ def test_different_code_versions_are_not_pooled(tmp_path):
     _make_run(tmp_path, "sasrec_s2026_20260917-000000_bbbbbb", seed=2026, git_sha="f" * 40)
     kept = agg._enforce_compatibility(agg.load_runs(tmp_path), allow_mixed=False)
     assert len(kept) == 1
+
+
+@pytest.mark.parametrize("git_dirty", [True, None], ids=["dirty", "unknown"])
+def test_a_run_whose_tree_is_not_the_commit_is_never_pooled(tmp_path, git_dirty):
+    """A dirty run's code is not the commit's code, so no SHA claim covers it.
+
+    The same holds when the check could not run at all (``None``): an
+    unanswerable question is not a clean answer.
+    """
+    _make_run(tmp_path, "sasrec_20260917-000000_aaaaaa", seed=42, git_sha="a" * 40)
+    _make_run(tmp_path, "sasrec_s2026_20260917-000000_bbbbbb", seed=2026,
+              git_sha="a" * 40, git_dirty=git_dirty)
+    loaded = agg.load_runs(tmp_path)
+    assert _signature_of(loaded, "sasrec_") != _signature_of(loaded, "sasrec_s2026")
+    assert len(agg._enforce_compatibility(loaded, allow_mixed=False)) == 1
+
+
+# --------------------------------------------------------------------------- #
+# declared code equivalence (analysis/code_equivalence.json)
+# --------------------------------------------------------------------------- #
+
+def _declared_classes() -> list[dict]:
+    blob = json.loads((agg.ROOT / "analysis" / "code_equivalence.json").read_text(encoding="utf-8"))
+    return blob.get("classes") or []
+
+
+def test_the_equivalence_file_is_self_consistent_and_every_commit_exists():
+    """Each class must be checkable: a reference, a reason, and real commits."""
+    classes = _declared_classes()
+    assert classes, "the file must declare at least one class, or it is dead weight"
+    for cls in classes:
+        assert cls.get("id"), "a class without an id cannot be reported"
+        assert cls.get("reason", "").strip(), f"{cls['id']}: a class needs its reason"
+        assert cls["reference"] in cls["commits"], (
+            f"{cls['id']}: the reference commit must be one of the class's commits"
+        )
+        for sha in cls["commits"]:
+            assert _git("cat-file", "-e", f"{sha}^{{commit}}").returncode == 0, (
+                f"{cls['id']}: commit {sha} does not exist in this repository"
+            )
+
+
+def test_a_declared_equivalence_class_pools_its_commits_end_to_end(tmp_path, monkeypatch, capsys):
+    """The 28 runs behind the tables span nine commits; they must still pool."""
+    cls = _declared_classes()[0]
+    older, newer = _rev(cls["reference"]), _rev(cls["commits"][-1])
+    runs, tables = tmp_path / "runs", tmp_path / "tables"
+    _make_run(runs, "sasrec_20260917-000000_aaaaaa", seed=42, git_sha=older)
+    _make_run(runs, "sasrec_s2026_20260917-000000_bbbbbb", seed=2026, git_sha=newer)
+
+    _run_main(monkeypatch, runs, tables)
+
+    index = (tables / "runs_index.csv").read_text(encoding="utf-8")
+    assert "sasrec_20260917-000000_aaaaaa" in index
+    assert "sasrec_s2026_20260917-000000_bbbbbb" in index
+    # the class is named when it is used, with the commits it actually pooled
+    out = capsys.readouterr().out
+    assert f"code equivalence class {cls['id']!r}" in out
+    assert "mixes" not in out
+
+
+def test_a_dirty_run_cannot_join_a_declared_class(tmp_path):
+    """The class is a claim about *commits*; it cannot cover an edited tree."""
+    cls = _declared_classes()[0]
+    older, newer = _rev(cls["reference"]), _rev(cls["commits"][-1])
+    _make_run(tmp_path, "sasrec_20260917-000000_aaaaaa", seed=42, git_sha=older)
+    _make_run(tmp_path, "sasrec_s2026_20260917-000000_bbbbbb", seed=2026,
+              git_sha=newer, git_dirty=True)
+    kept = agg._enforce_compatibility(agg.load_runs(tmp_path), allow_mixed=False)
+    assert len(kept) == 1
+
+
+def test_an_undeclared_commit_difference_is_still_refused(tmp_path, capsys):
+    """Declaring one class must not soften the gate for anything else."""
+    older, newer = _rev("9c82a19"), _rev("503aa40")
+    assert agg.declared_class(older) is None and agg.declared_class(newer) is None
+    _make_run(tmp_path, "sasrec_20260917-000000_aaaaaa", seed=42, git_sha=older)
+    _make_run(tmp_path, "sasrec_s2026_20260917-000000_bbbbbb", seed=2026, git_sha=newer)
+
+    kept = agg._enforce_compatibility(agg.load_runs(tmp_path), allow_mixed=False)
+    assert len(kept) == 1
+    assert "mixes 2 incompatible provenances" in capsys.readouterr().out
+
+
+def test_equal_determining_trees_always_compare_equal():
+    """The declaration *widens* comparability; it never narrows it.
+
+    Equal result-determining trees are proof of equal code, so they must always
+    end up in the same class -- including for a commit the file does not list
+    whose tree matches a member's (the closure that keeps the class index from
+    being stricter than the raw tree hash it replaced).
+    """
+    hist = _git("log", "--format=%h").stdout.split()
+    if not hist:
+        pytest.skip("not a git checkout")
+    by_commit = agg.equivalence_classes()["by_commit"]
+    seen: dict[str, str] = {}
+    closed_by_tree = 0
+    for sha in hist:
+        tree = agg.code_identity(sha)
+        if tree is None:
+            continue
+        cls = agg.code_class(sha)
+        if tree in seen:
+            assert seen[tree] == cls, (
+                f"{sha} has the same result-determining tree as another commit "
+                f"but a different code identity ({cls} vs {seen[tree]})"
+            )
+        seen[tree] = cls
+        if cls.startswith("class:") and sha not in by_commit and sha[:7] not in by_commit:
+            closed_by_tree += 1
+    assert closed_by_tree, "no commit reached a class through its tree hash; the file is dead weight"
 
 
 def test_a_manifest_less_run_is_never_pooled_with_a_documented_one(tmp_path):

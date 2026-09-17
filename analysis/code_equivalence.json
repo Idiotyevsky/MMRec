@@ -1,0 +1,23 @@
+{
+  "_readme": [
+    "Commits whose result-determining code a human has verified to be equivalent.",
+    "The aggregator pools runs across commits only when they are in the same class",
+    "here; anything not listed keeps its own identity and is refused as before.",
+    "Every entry states what the diff actually is, so the claim can be re-checked",
+    "with `git diff <ref> <sha> -- src scripts configs pyproject.toml`.",
+    "tests/test_aggregation_guard.py pins that undeclared commits are still refused",
+    "and that every commit listed here exists in this repository."
+  ],
+  "classes": [
+    {
+      "id": "ar-fix-2026-09-17",
+      "reference": "cc06c20",
+      "reason": "The re-run batches after the two training fixes. Their diff against the reference touches only: the `random` model branch (configs/random*.yaml, src/models/random_model.py, the `random` case in the factory and trainer encode-fn), provenance and git-state recording (src/utils/provenance.py, scripts/train.py), an evaluator docstring, and the queue runner's skip guard. None of these can change a non-Random model's training or ranking; the main matrix (cc06c20) was re-run with three seeds and reproduces the ordering it was re-run for.",
+      "commits": [
+        "cc06c20", "45901ec", "6ae6a69", "27c70db", "a74dcb8", "902670e",
+        "710b065", "7e61619", "41200d7", "8a72e5c", "c448e67", "dd14e83",
+        "5f84798", "31888d8"
+      ]
+    }
+  ]
+}

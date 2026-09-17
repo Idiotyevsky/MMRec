@@ -1,5 +1,7 @@
 tag,model,dataset,fusion,modalities,seed,id_dropout,item_dropout,bucket_rule,head_users,head_Recall@20,head_NDCG@20,middle_users,middle_Recall@20,middle_NDCG@20,tail_users,tail_Recall@20,tail_NDCG@20,run_id
 bpr,bpr,base,-,-,42,0.0,0.0,frequency_quantile,33521,0.071895,0.028933,21904,0.023968,0.009427,44575,0.009063,0.002928,bpr_20260917-052736_83d397
+bpr_s2026,bpr,base,-,-,2026,0.0,0.0,frequency_quantile,33521,0.073775,0.029208,21904,0.022553,0.008846,44575,0.007112,0.002407,bpr_s2026_20260917-124004_33da59
+bpr_s3407,bpr,base,-,-,3407,0.0,0.0,frequency_quantile,33521,0.072611,0.028732,21904,0.023055,0.009016,44575,0.008368,0.002749,bpr_s3407_20260917-131046_068bd4
 ab_id_image,mm_sasrec,base,gated,id+image,42,0.0,0.0,frequency_quantile,33521,0.20065,0.094803,21904,0.118243,0.052961,44575,0.068559,0.028294,ab_id_image_20260917-072250_7c02de
 ab_id_text,mm_sasrec,base,gated,id+text,42,0.0,0.0,frequency_quantile,33521,0.19364,0.0934,21904,0.111806,0.04973,44575,0.063197,0.025987,ab_id_text_20260917-070902_10b539
 ab_id_text_image_video,mm_sasrec,base,gated,id+text+image+video,42,0.0,0.0,frequency_quantile,33521,0.206438,0.098483,21904,0.123311,0.054459,44575,0.069232,0.027946,ab_id_text_image_video_20260917-073834_5fb438
@@ -9,6 +11,7 @@ ab_text_only,mm_sasrec,base,gated,text,42,0.0,0.0,frequency_quantile,33521,0.173
 ab_video_only,mm_sasrec,base,gated,video,42,0.0,0.0,frequency_quantile,33521,0.203872,0.085562,21904,0.071539,0.02624,44575,0.01447,0.004713,ab_video_only_20260917-084357_3c9f50
 mm_concat,mm_sasrec,base,concat,id+text+image,42,0.0,0.0,frequency_quantile,33521,0.213538,0.100587,21904,0.131392,0.05848,44575,0.08673,0.035974,mm_concat_20260917-075552_b84b95
 mm_concat_iddrop,mm_sasrec,base,concat,id+text+image,42,0.2,0.0,frequency_quantile,33521,0.219743,0.102865,21904,0.138514,0.061548,44575,0.089355,0.03679,mm_concat_iddrop_20260917-082810_d41504
+mm_concat_s2026,mm_sasrec,base,concat,id+text+image,2026,0.0,0.0,frequency_quantile,33521,0.213001,0.100211,21904,0.134587,0.059408,44575,0.086887,0.035858,mm_concat_s2026_20260917-131630_b6acd8
 mm_gated,mm_sasrec,base,gated,id+text+image,42,0.0,0.0,frequency_quantile,33521,0.215447,0.100994,21904,0.120982,0.052914,44575,0.063915,0.024783,mm_gated_20260917-053644_dfe900
 mm_gated_iddrop,mm_sasrec,base,gated,id+text+image,42,0.2,0.0,frequency_quantile,33521,0.204767,0.096634,21904,0.1271,0.056474,44575,0.077757,0.030924,mm_gated_iddrop_20260917-053644_ec427f
 mm_gated_iddrop_s2026,mm_sasrec,base,gated,id+text+image,2026,0.2,0.0,frequency_quantile,33521,0.203604,0.097592,21904,0.131392,0.05757,44575,0.079035,0.031855,mm_gated_iddrop_s2026_20260917-060143_87b54b
@@ -16,6 +19,8 @@ mm_gated_iddrop_s3407,mm_sasrec,base,gated,id+text+image,3407,0.2,0.0,frequency_
 mm_gated_s2026,mm_sasrec,base,gated,id+text+image,2026,0.0,0.0,frequency_quantile,33521,0.207631,0.098429,21904,0.121804,0.05325,44575,0.066091,0.026054,mm_gated_s2026_20260917-055019_00d3df
 mm_gated_s3407,mm_sasrec,base,gated,id+text+image,3407,0.0,0.0,frequency_quantile,33521,0.20781,0.099334,21904,0.11838,0.051876,44575,0.070869,0.028404,mm_gated_s3407_20260917-060306_0cecfd
 popular,popular,base,-,-,42,0.0,0.0,frequency_quantile,33521,0.01062,0.004264,21904,0.0,0.0,44575,0.0,0.0,popular_20260917-052720_ef9928
+popular_s2026,popular,base,-,-,2026,0.0,0.0,frequency_quantile,33521,0.01062,0.004264,21904,0.0,0.0,44575,0.0,0.0,popular_s2026_20260917-123933_4a10ba
+popular_s3407,popular,base,-,-,3407,0.0,0.0,frequency_quantile,33521,0.01062,0.004264,21904,0.0,0.0,44575,0.0,0.0,popular_s3407_20260917-123948_84fec0
 sasrec,sasrec,base,-,id,42,0.0,0.0,frequency_quantile,33521,0.192417,0.091348,21904,0.122991,0.056109,44575,0.07585,0.031074,sasrec_20260917-060603_47936c
 sasrec_itemdrop,sasrec,base,-,id,42,0.0,0.2,frequency_quantile,33521,0.195221,0.091854,21904,0.125365,0.056947,44575,0.079686,0.032541,sasrec_itemdrop_20260917-053644_26a598
 sasrec_itemdrop_s2026,sasrec,base,-,id,2026,0.0,0.2,frequency_quantile,33521,0.197727,0.092817,21904,0.127739,0.055922,44575,0.078901,0.032434,sasrec_itemdrop_s2026_20260917-055725_ff738d

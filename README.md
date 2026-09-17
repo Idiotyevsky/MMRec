@@ -180,8 +180,8 @@ as real.
 <!-- TABLE:OVERALL -->
 | Model | Recall@10 | Recall@20 | NDCG@10 | NDCG@20 | MRR@20 | Coverage@20 | Params | #seeds |
 |---|---|---|---|---|---|---|---|---|
-| Popular (train-freq) | 0.0023 | 0.0036 | 0.0011 | 0.0014 | 0.0008 | 0.0025 | 0 | 1 |
-| BPR-MF | 0.0198 | 0.0334 | 0.0096 | 0.0131 | 0.0075 | 0.7409 | 15326720 | 1 |
+| Popular (train-freq) | 0.0023 ± 0.0000 | 0.0036 ± 0.0000 | 0.0011 ± 0.0000 | 0.0014 ± 0.0000 | 0.0008 ± 0.0000 | 0.0025 ± 0.0000 | 0 | 3 |
+| BPR-MF | 0.0199 ± 0.0001 | 0.0331 ± 0.0003 | 0.0096 ± 0.0001 | 0.0129 ± 0.0001 | 0.0074 ± 0.0001 | 0.7275 ± 0.0121 | 15326720 | 3 |
 | SASRec (ID-only) | 0.0852 ± 0.0012 | 0.1224 ± 0.0025 | 0.0463 ± 0.0006 | 0.0557 ± 0.0009 | 0.0371 ± 0.0005 | 0.8017 ± 0.0212 | 2929792 | 3 |
 | SASRec (ID-only) + item-dropout 0.2 | 0.0886 ± 0.0008 | 0.1283 ± 0.0011 | 0.0479 ± 0.0002 | 0.0579 ± 0.0001 | 0.0382 ± 0.0005 | 0.7426 ± 0.0155 | 2929920 | 3 |
 | MM-SASRec (id+image, gated) | 0.0851 | 0.1237 | 0.0463 | 0.0560 | 0.0371 | 0.8438 | 3096322 | 1 |
@@ -191,7 +191,7 @@ as real.
 | MM-SASRec (text+image, gated) | 0.0704 | 0.1126 | 0.0355 | 0.0461 | 0.0278 | 0.3555 | 619778 | 1 |
 | MM-SASRec (text, gated) | 0.0413 | 0.0702 | 0.0196 | 0.0269 | 0.0151 | 0.2455 | 486785 | 1 |
 | MM-SASRec (video, gated) | 0.0570 | 0.0905 | 0.0281 | 0.0365 | 0.0217 | 0.2872 | 569985 | 1 |
-| MM-SASRec (id+text+image, concat) | 0.0959 | 0.1390 | 0.0517 | 0.0626 | 0.0412 | 0.7832 | 3212288 | 1 |
+| MM-SASRec (id+text+image, concat) | 0.0958 ± 0.0000 | 0.1393 ± 0.0004 | 0.0516 ± 0.0001 | 0.0626 ± 0.0000 | 0.0412 ± 0.0001 | 0.7742 ± 0.0127 | 3212288 | 2 |
 | MM-SASRec (id+text+image, concat) + ID-dropout 0.2 | 0.0992 | 0.1438 | 0.0531 | 0.0644 | 0.0422 | 0.7503 | 3212288 | 1 |
 | MM-SASRec (id+text+image, gated) | 0.0868 ± 0.0006 | 0.1267 ± 0.0008 | 0.0466 ± 0.0006 | 0.0567 ± 0.0006 | 0.0372 ± 0.0006 | 0.7388 ± 0.0210 | 3179395 | 3 |
 | MM-SASRec (id+text+image, gated) + ID-dropout 0.2 | 0.0902 ± 0.0012 | 0.1314 ± 0.0007 | 0.0487 ± 0.0007 | 0.0591 ± 0.0005 | 0.0390 ± 0.0005 | 0.7891 ± 0.0183 | 3179395 | 3 |
@@ -205,11 +205,11 @@ users it was computed over. If a run is missing, the claim renders as `TBD`
 rather than as a remembered number.
 
 <!-- TABLE:FINDINGS -->
-- **Ordering holds** — Popular 0.0036 < BPR-MF 0.0334 < SASRec 0.1224 test Recall@20 over 100 000 evaluated test users (1 run / 1 run / 3 runs respectively).
+- **Ordering holds** — Popular 0.0036 < BPR-MF 0.0331 < SASRec 0.1224 test Recall@20 over 100 000 evaluated test users (3 runs / 3 runs / 3 runs respectively).
 - **Gain_reg** (item-dropout control) = SASRec+item-dropout 0.2 − SASRec = +0.0059 test Recall@20 over 100 000 users (3 runs vs 3 runs); NDCG@20 +0.0022.
 - **Gain_content** (over the dropout control) = MM-SASRec gated+ID-dropout 0.2 − SASRec+item-dropout 0.2 = +0.0031 test Recall@20 over 100 000 users (3 runs vs 3 runs); NDCG@20 +0.0012.
 - **Multimodal vs ID-only** = 100 000 users: Recall@20 0.1224 (ID-only) → 0.1314, NDCG@20 0.0557 → 0.0591.
-- **Fusion without ID dropout** — gated 0.1267 vs concat 0.1390 test Recall@20 vs ID-only 0.1224 (same 100 000 users); Δ vs ID-only gated +0.0043, concat +0.0166. With ID-dropout 0.2 the order is unchanged: gated 0.1314 vs concat 0.1438.
+- **Fusion without ID dropout** — gated 0.1267 vs concat 0.1393 test Recall@20 vs ID-only 0.1224 (same 100 000 users); Δ vs ID-only gated +0.0043, concat +0.0169. With ID-dropout 0.2 the order is unchanged: gated 0.1314 vs concat 0.1438.
 - **Long tail** (buckets from training interactions only, rule `frequency_quantile`, 3 runs), Recall@20 — head: ID-only 0.1878 → MM 0.2031 (+0.0153), vs dropout control (0.1953) +0.0078; middle: ID-only 0.1185 → MM 0.1270 (+0.0085), vs dropout control (0.1256) +0.0014; tail: ID-only 0.0752 → MM 0.0797 (+0.0045), vs dropout control (0.0794) +0.0003. Bucket sizes: head 33 521 users, middle 21 904 users, tail 44 575 users. Concat+ID-dropout 0.2 reaches tail 0.0894 (+0.0100 vs the same dropout control).
 - **Cold items** (cold catalogue = 1 974 items, 12 717 users with a cold target): cold-only Recall@20 — theoretical uniform ranker 20/1974 = 0.0101, measured Random 0.0097, SASRec ID-only 0.0000, content-only MM-SASRec 0.1092, gated MM-SASRec 0.0983 (0.0789 with ID-dropout 0.2).
 _Every value above is computed from `results/tables/*.csv` by `analysis/make_readme_tables.py`; recall denominators are the evaluated test users named in each line._
@@ -238,7 +238,7 @@ The per-bucket breakdown of both is in the gain table below.
 | MM |  | ✓ | ✓ |  | gated | — | — | 0.0704 | 0.1126 | 0.0461 | 619778 |
 | MM | ✓ |  | ✓ |  | gated | — | — | 0.0851 | 0.1237 | 0.0560 | 3096322 |
 | MM | ✓ | ✓ |  |  | gated | — | — | 0.0821 | 0.1176 | 0.0538 | 3046402 |
-| MM | ✓ | ✓ | ✓ |  | concat | — | — | 0.0959 | 0.1390 | 0.0626 | 3212288 |
+| MM | ✓ | ✓ | ✓ |  | concat | — | — | 0.0958 ± 0.0000 | 0.1393 ± 0.0004 | 0.0626 ± 0.0000 | 3212288 |
 | MM | ✓ | ✓ | ✓ |  | concat | 0.2 | — | 0.0992 | 0.1438 | 0.0644 | 3212288 |
 | MM | ✓ | ✓ | ✓ |  | gated | — | — | 0.0868 ± 0.0006 | 0.1267 ± 0.0008 | 0.0567 ± 0.0006 | 3179395 |
 | MM | ✓ | ✓ | ✓ |  | gated | 0.2 | — | 0.0902 ± 0.0012 | 0.1314 ± 0.0007 | 0.0591 ± 0.0005 | 3179395 |
@@ -291,7 +291,7 @@ _Popularity rule: `frequency_quantile` (training interactions only)._
 
 | Model | Head Recall@20 | Middle Recall@20 | Tail Recall@20 | Head NDCG@20 | Middle NDCG@20 | Tail NDCG@20 |
 |---|---|---|---|---|---|---|
-| BPR-MF | 0.0719 | 0.0240 | 0.0091 | 0.0289 | 0.0094 | 0.0029 |
+| BPR-MF | 0.0728 ± 0.0009 | 0.0232 ± 0.0007 | 0.0082 ± 0.0010 | 0.0290 ± 0.0002 | 0.0091 ± 0.0003 | 0.0027 ± 0.0003 |
 | MM-SASRec (id+image, gated) | 0.2006 | 0.1182 | 0.0686 | 0.0948 | 0.0530 | 0.0283 |
 | MM-SASRec (id+text, gated) | 0.1936 | 0.1118 | 0.0632 | 0.0934 | 0.0497 | 0.0260 |
 | MM-SASRec (id+text+image+video, gated) | 0.2064 | 0.1233 | 0.0692 | 0.0985 | 0.0545 | 0.0279 |
@@ -299,11 +299,11 @@ _Popularity rule: `frequency_quantile` (training interactions only)._
 | MM-SASRec (text+image, gated) | 0.2256 | 0.0999 | 0.0339 | 0.0990 | 0.0366 | 0.0109 |
 | MM-SASRec (text, gated) | 0.1736 | 0.0282 | 0.0130 | 0.0692 | 0.0089 | 0.0039 |
 | MM-SASRec (video, gated) | 0.2039 | 0.0715 | 0.0145 | 0.0856 | 0.0262 | 0.0047 |
-| MM-SASRec (id+text+image, concat) | 0.2135 | 0.1314 | 0.0867 | 0.1006 | 0.0585 | 0.0360 |
+| MM-SASRec (id+text+image, concat) | 0.2133 ± 0.0004 | 0.1330 ± 0.0023 | 0.0868 ± 0.0001 | 0.1004 ± 0.0003 | 0.0589 ± 0.0007 | 0.0359 ± 0.0001 |
 | MM-SASRec (id+text+image, concat) + ID-dropout 0.2 | 0.2197 | 0.1385 | 0.0894 | 0.1029 | 0.0615 | 0.0368 |
 | MM-SASRec (id+text+image, gated) | 0.2103 ± 0.0045 | 0.1204 ± 0.0018 | 0.0670 ± 0.0036 | 0.0996 ± 0.0013 | 0.0527 ± 0.0007 | 0.0264 ± 0.0018 |
 | MM-SASRec (id+text+image, gated) + ID-dropout 0.2 | 0.2031 ± 0.0020 | 0.1270 ± 0.0045 | 0.0797 ± 0.0024 | 0.0968 ± 0.0008 | 0.0565 ± 0.0011 | 0.0321 ± 0.0013 |
-| Popular (train-freq) | 0.0106 | 0.0000 | 0.0000 | 0.0043 | 0.0000 | 0.0000 |
+| Popular (train-freq) | 0.0106 ± 0.0000 | 0.0000 ± 0.0000 | 0.0000 ± 0.0000 | 0.0043 ± 0.0000 | 0.0000 ± 0.0000 | 0.0000 ± 0.0000 |
 | SASRec (ID-only) | 0.1878 ± 0.0040 | 0.1185 ± 0.0042 | 0.0752 ± 0.0006 | 0.0885 ± 0.0025 | 0.0538 ± 0.0022 | 0.0320 ± 0.0008 |
 | SASRec (ID-only) + item-dropout 0.2 | 0.1953 ± 0.0025 | 0.1256 ± 0.0021 | 0.0794 ± 0.0004 | 0.0923 ± 0.0005 | 0.0564 ± 0.0005 | 0.0327 ± 0.0004 |
 <!-- /TABLE:LONGTAIL -->
@@ -320,7 +320,7 @@ _Popularity rule: `frequency_quantile` (training interactions only)._
 | MM-SASRec (text+image, gated) | +0.0378 | -0.0186 | -0.0413 | +0.0303 | -0.0257 | -0.0455 |
 | MM-SASRec (text, gated) | -0.0142 | -0.0903 | -0.0622 | -0.0217 | -0.0974 | -0.0664 |
 | MM-SASRec (video, gated) | +0.0161 | -0.0470 | -0.0607 | +0.0086 | -0.0541 | -0.0649 |
-| MM-SASRec (id+text+image, concat) | +0.0257 | +0.0129 | +0.0115 | +0.0182 | +0.0058 | +0.0073 |
+| MM-SASRec (id+text+image, concat) | +0.0255 | +0.0145 | +0.0116 | +0.0180 | +0.0074 | +0.0074 |
 | MM-SASRec (id+text+image, concat) + ID-dropout 0.2 | +0.0319 | +0.0200 | +0.0142 | +0.0244 | +0.0129 | +0.0100 |
 | MM-SASRec (id+text+image, gated) | +0.0225 | +0.0019 | -0.0082 | +0.0150 | -0.0052 | -0.0124 |
 | MM-SASRec (id+text+image, gated) + ID-dropout 0.2 | +0.0153 | +0.0085 | +0.0045 | +0.0078 | +0.0014 | +0.0003 |

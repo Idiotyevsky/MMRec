@@ -16,9 +16,18 @@ Two gates protect the tables:
 * runs without a ``run_manifest.json`` (i.e. produced before provenance was
   recorded, or crashed before finishing) are **legacy** and are skipped unless
   ``--include-legacy`` is given;
-* inside one experiment group every surviving run must agree on git SHA, dataset
-  fingerprint, config (modulo seed) and parameter count, or the odd ones out are
-  excluded -- ``--allow-mixed`` downgrades that to a warning for debugging only.
+* inside one experiment group every surviving run must agree on the code that
+  produced it, the dataset fingerprint, the config (modulo seed) and the
+  parameter count, or the odd ones out are excluded -- ``--allow-mixed``
+  downgrades that to a warning for debugging only.
+
+"Same code" is a hash of ``RESULT_DETERMINING_PATHS`` at the run's commit, not
+the commit string: a commit that only touches the README, a test or a table
+cannot change a number, and refusing to average across it would drop runs for
+no reason.  Commits that *do* differ inside those paths but have been checked
+hunk by hunk to be inert for the models in question are listed in
+``analysis/code_equivalence.json`` together with the reason; those pool as one
+class, and the class is printed when it is used.
 
 Legacy runs are not deleted: they were moved to
 ``results/legacy_pre_autoregressive_fix/`` after the training-objective fix.
@@ -27,8 +36,10 @@ Legacy runs are not deleted: they were moved to
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -41,10 +52,11 @@ sys.path.insert(0, str(ROOT))
 from src.data.dataset import ProcessedData  # noqa: E402
 from src.evaluation.evaluator import EvalResult  # noqa: E402
 from src.evaluation.slicing import load_ranking, sliced_metrics  # noqa: E402
-from src.utils.provenance import config_hash, load_manifest  # noqa: E402
+from src.utils.provenance import RESULT_DETERMINING_PATHS, config_hash, load_manifest  # noqa: E402
 
 RUNS_DIR = ROOT / "results" / "runs"
 TABLES_DIR = ROOT / "results" / "tables"
+EQUIVALENCE_FILE = ROOT / "analysis" / "code_equivalence.json"
 
 _DATASET_CACHE: dict[str, ProcessedData] = {}
 
@@ -347,14 +359,156 @@ def _group_key(r: dict) -> str:
     return r["tag"]
 
 
+def code_identity(sha: str | None) -> str | None:
+    """Hash of the result-determining paths at ``sha``, or ``None``.
+
+    Two runs are comparable when the code that could change a number is the
+    same, and that is a property of the paths, not of the commit string: a
+    commit that only touches the README, a table or a test cannot change a
+    result, and refusing to average across it would drop runs for no reason.
+    ``None`` means git could not answer (no repo, unknown commit, shallow
+    clone) and the caller falls back to the commit string.
+    """
+    if not sha:
+        return None
+    try:
+        out = subprocess.run(
+            ["git", "ls-tree", "-r", "--full-tree", sha, "--", *RESULT_DETERMINING_PATHS],
+            cwd=ROOT, capture_output=True, timeout=10,
+        )
+    except Exception:
+        return None
+    if out.returncode != 0 or not out.stdout.strip():
+        return None
+    return hashlib.sha256(out.stdout).hexdigest()[:12]
+
+
+_EQUIVALENCE_CACHE: dict[str, dict] | None = None
+
+
+def equivalence_classes() -> dict[str, dict]:
+    """``analysis/code_equivalence.json`` as a two-way index.
+
+    ``by_commit`` maps every declared commit (and its 7-char prefix) to the
+    class.  ``by_tree`` maps the result-determining tree hash of every declared
+    commit to the same class, which is what makes the declaration transitive in
+    the useful direction: a commit the file does not list, but whose
+    result-determining tree is byte-identical to a listed member's, *is* that
+    member's code and therefore belongs to the class as well.  Without it the
+    guard would be stricter *and* less consistent than the raw tree hash.
+
+    The file is data, not inference: the aggregator never decides on its own
+    that two commits differ in an inert way, it only honours a declaration a
+    reviewer can re-check with
+    ``git diff <ref> <sha> -- src scripts configs pyproject.toml``.
+    """
+    global _EQUIVALENCE_CACHE
+    if _EQUIVALENCE_CACHE is None:
+        by_commit: dict[str, dict] = {}
+        by_tree: dict[str, dict] = {}
+        try:
+            blob = json.loads(EQUIVALENCE_FILE.read_text(encoding="utf-8"))
+        except Exception:
+            blob = {}
+        for cls in blob.get("classes") or []:
+            if not isinstance(cls, dict) or not cls.get("id"):
+                continue
+            for sha in cls.get("commits") or []:
+                if not isinstance(sha, str) or not sha:
+                    continue
+                sha = sha.strip().lower()
+                by_commit.setdefault(sha, cls)
+                if len(sha) > 7:
+                    by_commit.setdefault(sha[:7], cls)
+                tree = code_identity(sha)
+                if tree:
+                    by_tree.setdefault(tree, cls)
+        _EQUIVALENCE_CACHE = {"by_commit": by_commit, "by_tree": by_tree}
+    return _EQUIVALENCE_CACHE
+
+
+def declared_class(sha: str | None) -> dict | None:
+    """The equivalence class a commit provably belongs to, if any."""
+    if not sha:
+        return None
+    index = equivalence_classes()
+    s = sha.strip().lower()
+    cls = index["by_commit"].get(s) or index["by_commit"].get(s[:7])
+    if cls is not None:
+        return cls
+    tree = code_identity(s)
+    return index["by_tree"].get(tree) if tree else None
+
+
+def code_class(sha: str | None) -> str:
+    """How two runs' code versions are compared.
+
+    A declared class wins (a reviewed statement about the code), then the tree
+    hash of the result-determining paths (the code itself), then the commit
+    string (nothing better available).
+    """
+    cls = declared_class(sha)
+    if cls:
+        return f"class:{cls['id']}"
+    return code_identity(sha) or (sha or "<no-sha>")
+
+
 def _signature(r: dict) -> tuple:
     """Everything that must agree for two runs to be comparable at all."""
+    if not r["provenance"]:
+        return ("<no-manifest>", r["dataset_hash"], r["config_core_hash"], r["params"])
+    if r["git_dirty"] is not False:
+        # ``True`` means the working tree differed from the commit, so the code
+        # that ran is not the commit's code; ``None``/missing means the question
+        # could not be answered.  Either way no commit-level claim -- the SHA,
+        # or a declared equivalence class -- applies, so the run can only be
+        # pooled with itself.  (``provenance._status_paths`` returns ``None``
+        # rather than ``[]`` on failure for exactly this reason: a failed check
+        # must never be reported as a clean one.)
+        return ("<unverified>", r["run_id"], r["dataset_hash"],
+                r["config_core_hash"], r["params"])
     return (
-        r["git_sha"] if r["provenance"] else "<no-manifest>",
+        code_class(r["git_sha"]),
         r["dataset_hash"],
         r["config_core_hash"],
         r["params"],
     )
+
+
+def _sig_label(sig: tuple) -> str:
+    """Render the code element of a signature for the warnings.
+
+    A tree hash is opaque, so the first 8 characters are shown as before; a
+    declared class is shown by name, which is the whole point of declaring it.
+    """
+    code = str(sig[0])
+    if code.startswith(("class:", "<")):
+        return code
+    return f"git={code[:8]}"
+
+
+def report_equivalence(runs: list[dict]) -> None:
+    """Print which declared equivalence classes actually pool runs, and why.
+
+    Silence would hide the one thing a reader of the tables cannot see in them:
+    that the pooled seeds were produced by different commits.  Only classes
+    that really span more than one commit are reported.
+    """
+    used: dict[str, tuple[dict, set[str]]] = {}
+    for r in runs:
+        cls = declared_class(r["git_sha"])
+        if cls is None or r["git_dirty"] is not False:
+            continue
+        entry = used.setdefault(cls["id"], (cls, set()))
+        entry[1].add((r["git_sha"] or "")[:8])
+    for cls_id, (cls, shas) in sorted(used.items()):
+        if len(shas) < 2:
+            continue
+        print(
+            f"code equivalence class {cls_id!r} pools {len(shas)} commits "
+            f"({', '.join(sorted(shas))}) on reference {cls.get('reference')}:\n"
+            f"    {cls.get('reason', '')}"
+        )
 
 
 def _drop_duplicate_seeds(runs: list[dict]) -> tuple[list[dict], list[str]]:
@@ -405,13 +559,13 @@ def _enforce_compatibility(runs: list[dict], allow_mixed: bool) -> list[dict]:
         print(
             f"WARNING: experiment group {tag!r} mixes {len(buckets)} incompatible "
             f"provenances; keeping {len(best)} run(s) with "
-            f"git={str(best_sig[0])[:8]} dataset={str(best_sig[1])[:8]} "
+            f"{_sig_label(best_sig)} dataset={str(best_sig[1])[:8]} "
             f"params={best_sig[3]}"
         )
         for sig, rs in ranked[1:]:
             for r in rs:
                 print(
-                    f"    excluded {r['run_id']}: git={str(sig[0])[:8]} "
+                    f"    excluded {r['run_id']}: {_sig_label(sig)} "
                     f"dataset={str(sig[1])[:8]} params={sig[3]} "
                     f"(seed {r['seed']}, best_epoch {r['best_epoch']})"
                 )
@@ -513,6 +667,7 @@ def main() -> None:
     for rid in dropped:
         print(f"WARNING: dropped duplicate (tag, seed) run {rid}")
 
+    report_equivalence(runs)
     runs = _enforce_compatibility(runs, args.allow_mixed)
     print(f"aggregating {len(runs)} run(s)")
 
