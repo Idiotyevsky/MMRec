@@ -11,9 +11,10 @@ from ..data.dataset import ProcessedData
 from ..models.bpr import BPRMF
 from ..models.mm_sasrec import MMSASRec
 from ..models.popular import PopularRecommender
+from ..models.random_model import RandomRecommender
 from ..models.sasrec import SASRec
 
-MODEL_NAMES = ("popular", "bpr", "sasrec", "mm_sasrec")
+MODEL_NAMES = ("popular", "bpr", "sasrec", "mm_sasrec", "random")
 
 
 def _row_for_item(processed_dir: Path, modalities: list[str]) -> dict[str, np.ndarray]:
@@ -78,6 +79,13 @@ def build_model(cfg, data: ProcessedData, device: torch.device | str = "cpu") ->
             num_items=data.num_items,
             train_freq=data.train_freq,
             cold_item_mask=cold_mask,
+        )
+    elif name == "random":
+        # no cold mask on purpose: zeroing cold scores would rank every cold
+        # item last and measure 0 instead of the k/N chance floor
+        model = RandomRecommender(
+            num_items=data.num_items,
+            seed=int(cfg.training.get("seed", 42)),
         )
     else:
         raise ValueError(f"Unknown model name {name!r}; expected one of {MODEL_NAMES}")

@@ -43,6 +43,7 @@ def _cfg(name: str, processed_dir, feature_dir, **model_kw) -> Config:
                    "id_dropout_prob": 0.3}),
     ("bpr", {}),
     ("popular", {}),
+    ("random", {}),
 ])
 def test_model_runs_end_to_end(name, extra, synthetic_data, synthetic_dir, tmp_path):
     set_seed(0)

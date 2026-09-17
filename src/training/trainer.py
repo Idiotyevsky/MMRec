@@ -133,7 +133,7 @@ class Trainer:
     # ------------------------------------------------------------------
     def _encode_fn(self):
         name = str(self.cfg.model.get("name", "mm_sasrec")).lower()
-        if name in ("bpr", "popular"):
+        if name in ("bpr", "popular", "random"):
             return lambda batch: self.model.encode(batch["user_id"].to(self.device))
         return lambda batch: self.model.encode(batch["input_ids"].to(self.device))
 

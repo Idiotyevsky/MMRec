@@ -1,0 +1,19 @@
+# Uniform-Random baseline: seeded noise, no training.  Its rank on a candidate
+# set of N items has the closed form k/N, which is the floor every cold-item
+# result must clear.
+
+model:
+  name: random
+
+data:
+  processed_dir: data/processed/base
+  feature_dir: data/raw
+  max_sequence_length: 50
+
+evaluation:
+  full_ranking: true
+  item_chunk_size: 4096
+  ks: [5, 10, 20]
+
+training:
+  seed: 42

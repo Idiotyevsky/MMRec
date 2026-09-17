@@ -1,0 +1,20 @@
+# Uniform-Random baseline on the simulated cold-item split.  With 1974 cold
+# items, cold-only Recall@20 has expectation 20/1974 = 0.01013: this run exists
+# to show that the measured value matches the closed form, i.e. that the cold
+# evaluation pipeline itself is unbiased.
+
+model:
+  name: random
+
+data:
+  processed_dir: data/processed/cold10
+  feature_dir: data/raw
+  max_sequence_length: 50
+
+evaluation:
+  full_ranking: true
+  item_chunk_size: 4096
+  ks: [5, 10, 20]
+
+training:
+  seed: 42
