@@ -175,14 +175,22 @@ def test_long_tail_findings_quote_the_headline_mm_row(tables):
     reg_row = lt_row("sasrec_itemdrop", "id", "0.0", "0.1600")
     reg_row["model"] = "sasrec"
     reg_row["item_dropout"] = "0.2"
+    # same regularisation and modality set, different fusion: the headline
+    # claim must quote the gated row, not whichever one sorts first
+    concat_row = lt_row("mm_concat_iddrop", "id+text+image", "0.2", "0.3000")
+    concat_row["fusion"] = "concat"
     _write(tables, "long_tail.csv", [
         id_row, reg_row,
         lt_row("ab_id_text", "id+text", "0.2", "0.9999"),
+        concat_row,
         lt_row("mm_gated_iddrop", "id+text+image", "0.2", "0.2000"),
     ], LONGTAIL_FIELDS)
     text = mrt.findings()
     assert "0.9999" not in text
-    assert "0.2000" in text
+    assert "MM 0.2000" in text      # the gated headline row
+    assert "MM 0.3000" not in text  # concat is quoted only as the extra clause
+    assert "Concat+ID-dropout 0.2 reaches tail tail 0.3000" not in text
+    assert "Concat+ID-dropout 0.2 reaches tail 0.3000" in text
 
 
 ABLATION_FIELDS = [
@@ -231,6 +239,23 @@ def test_cold_split_runs_stay_out_of_the_headline_tables(tables):
     assert "0.1000" in mrt.long_tail_table()
 
 
+def test_fusion_variants_are_not_grouped_across_capitalisation(tables):
+    """Regression: ablation.csv names the column ``Fusion`` while the grouping
+    key says ``fusion``, so gated and concat runs with the same modalities and
+    dropouts were averaged into one ``n_seeds: 4`` row."""
+    gated = _ablation_row("mm_gated", "base", "mm_sasrec", "0.1267")
+    gated.update({"modalities": "id+text+image", "ID": "1", "Text": "1",
+                  "Image": "1", "Video": "0", "Fusion": "gated", "params": "3179395"})
+    concat = dict(gated, tag="mm_concat", Fusion="concat", **{"Recall@20": "0.1390"})
+    _write(tables, "ablation.csv", [gated, concat], ABLATION_FIELDS)
+    merged = mrt.group_seeds(mrt.read("ablation.csv"))
+    assert {r["Fusion"] for r in merged} == {"gated", "concat"}
+    assert all(r["n_seeds"] == 1 for r in merged)
+    text = mrt.ablation_table()
+    assert "0.1267" in text and "0.1390" in text
+    assert "0.1329" not in text  # would be the gated/concat mean if merged
+
+
 COLD_FIELDS = [
     "tag", "model", "dataset", "fusion", "modalities", "id_dropout", "seed",
     "num_cold_items", "num_users", "Cold Recall@10", "Cold Recall@20",
@@ -261,11 +286,15 @@ def test_cold_claim_names_the_content_only_and_gated_rows_separately(tables):
         _cold_row("cold_random", "random", "id", "0.0", "0.0097"),
         _cold_row("cold_sasrec", "sasrec", "id", "0.0", "0.0000"),
         _cold_row("cold_content_only", "mm_sasrec", "text+image", "0.0", "0.0123"),
+        _cold_row("cold_mm_gated", "mm_sasrec", "id+text+image", "0.0", "0.0345"),
         _cold_row("cold_mm_gated_iddrop", "mm_sasrec", "id+text+image", "0.2", "0.0456"),
     ], COLD_FIELDS)
     text = mrt.findings()
     assert "content-only MM-SASRec 0.0123" in text
-    assert "gated MM-SASRec 0.0456" in text
+    # both gated variants appear: plain gated is the like-for-like number, the
+    # ID-dropout one is the base-split headline config
+    assert "gated MM-SASRec 0.0345" in text
+    assert "(0.0456 with ID-dropout 0.2)" in text
     assert "20/1974 = 0.0101" in text
 
 

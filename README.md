@@ -168,6 +168,12 @@ over seeds where more than one seed finished. `TBD` means the run has not finish
 **no number in this repository is estimated or filled in by hand**. Tables are
 regenerated from `results/tables/*.csv` by `python analysis/update_readme.py`.
 
+Every finished base-split configuration is listed: the ordering baseline
+(Popular → BPR → SASRec), the regularisation control, and the modality/fusion
+ablations. Rows without a ± are single-seed ablations — their seed spread has
+not been measured, so differences of the size of the multi-seed standard
+deviation (≈0.001–0.003 Recall@20) are **not** interpreted as real.
+
 ### Overall
 
 <!-- TABLE:OVERALL -->
@@ -180,8 +186,12 @@ regenerated from `results/tables/*.csv` by `python analysis/update_readme.py`.
 | MM-SASRec (id+image, gated) | 0.0851 | 0.1237 | 0.0463 | 0.0560 | 0.0371 | 0.8438 | 3096322 | 1 |
 | MM-SASRec (id+text, gated) | 0.0821 | 0.1176 | 0.0448 | 0.0538 | 0.0360 | 0.8524 | 3046402 | 1 |
 | MM-SASRec (id+text+image+video, gated) | 0.0879 | 0.1271 | 0.0475 | 0.0574 | 0.0380 | 0.7668 | 3345668 | 1 |
+| MM-SASRec (image, gated) | 0.0541 | 0.0874 | 0.0267 | 0.0351 | 0.0207 | 0.2746 | 536705 | 1 |
+| MM-SASRec (text+image, gated) | 0.0704 | 0.1126 | 0.0355 | 0.0461 | 0.0278 | 0.3555 | 619778 | 1 |
 | MM-SASRec (text, gated) | 0.0413 | 0.0702 | 0.0196 | 0.0269 | 0.0151 | 0.2455 | 486785 | 1 |
+| MM-SASRec (video, gated) | 0.0570 | 0.0905 | 0.0281 | 0.0365 | 0.0217 | 0.2872 | 569985 | 1 |
 | MM-SASRec (id+text+image, concat) | 0.0959 | 0.1390 | 0.0517 | 0.0626 | 0.0412 | 0.7832 | 3212288 | 1 |
+| MM-SASRec (id+text+image, concat) + ID-dropout 0.2 | 0.0992 | 0.1438 | 0.0531 | 0.0644 | 0.0422 | 0.7503 | 3212288 | 1 |
 | MM-SASRec (id+text+image, gated) | 0.0868 ± 0.0006 | 0.1267 ± 0.0008 | 0.0466 ± 0.0006 | 0.0567 ± 0.0006 | 0.0372 ± 0.0006 | 0.7388 ± 0.0210 | 3179395 | 3 |
 | MM-SASRec (id+text+image, gated) + ID-dropout 0.2 | 0.0902 ± 0.0012 | 0.1314 ± 0.0007 | 0.0487 ± 0.0007 | 0.0591 ± 0.0005 | 0.0390 ± 0.0005 | 0.7891 ± 0.0183 | 3179395 | 3 |
 <!-- /TABLE:OVERALL -->
@@ -199,8 +209,8 @@ rather than as a remembered number.
 - **Gain_content** (over the dropout control) = MM-SASRec gated+ID-dropout 0.2 − SASRec+item-dropout 0.2 = +0.0031 test Recall@20 over 100 000 users (3 runs vs 3 runs); NDCG@20 +0.0012.
 - **Multimodal vs ID-only** = 100 000 users: Recall@20 0.1224 (ID-only) → 0.1314, NDCG@20 0.0557 → 0.0591.
 - **Fusion without ID dropout** — gated 0.1267 vs concat 0.1390 test Recall@20 vs ID-only 0.1224 (same 100 000 users); Δ vs ID-only gated +0.0043, concat +0.0166.
-- **Long tail** (buckets from training interactions only, rule `frequency_quantile`, 3 runs), Recall@20 — head: ID-only 0.1878 → MM 0.2031 (+0.0153), vs dropout control (0.1953) +0.0078; middle: ID-only 0.1185 → MM 0.1270 (+0.0085), vs dropout control (0.1256) +0.0014; tail: ID-only 0.0752 → MM 0.0797 (+0.0045), vs dropout control (0.0794) +0.0003. Bucket sizes: head 33 521 users, middle 21 904 users, tail 44 575 users.
-- **Cold items** (cold catalogue = 1 974 items, 12 717 users with a cold target): cold-only Recall@20 — theoretical uniform ranker 20/1974 = 0.0101, measured Random 0.0097, SASRec ID-only 0.0000, content-only MM-SASRec 0.1092.
+- **Long tail** (buckets from training interactions only, rule `frequency_quantile`, 3 runs), Recall@20 — head: ID-only 0.1878 → MM 0.2031 (+0.0153), vs dropout control (0.1953) +0.0078; middle: ID-only 0.1185 → MM 0.1270 (+0.0085), vs dropout control (0.1256) +0.0014; tail: ID-only 0.0752 → MM 0.0797 (+0.0045), vs dropout control (0.0794) +0.0003. Bucket sizes: head 33 521 users, middle 21 904 users, tail 44 575 users. Concat+ID-dropout 0.2 reaches tail 0.0894 (+0.0100 vs the same dropout control).
+- **Cold items** (cold catalogue = 1 974 items, 12 717 users with a cold target): cold-only Recall@20 — theoretical uniform ranker 20/1974 = 0.0101, measured Random 0.0097, SASRec ID-only 0.0000, content-only MM-SASRec 0.1092, gated MM-SASRec 0.0983 (0.0789 with ID-dropout 0.2).
 _Every value above is computed from `results/tables/*.csv` by `analysis/make_readme_tables.py`; recall denominators are the evaluated test users named in each line._
 <!-- /TABLE:FINDINGS -->
 
@@ -221,10 +231,15 @@ The per-bucket breakdown of both is in the gain table below.
 |---|---|---|---|---|---|---|---|---|---|---|---|
 | ID-only | ✓ |  |  |  | - | — | — | 0.0852 ± 0.0012 | 0.1224 ± 0.0025 | 0.0557 ± 0.0009 | 2929792 |
 | ID-only | ✓ |  |  |  | - | — | 0.2 | 0.0886 ± 0.0008 | 0.1283 ± 0.0011 | 0.0579 ± 0.0001 | 2929920 |
+| MM |  |  |  | ✓ | gated | — | — | 0.0570 | 0.0905 | 0.0365 | 569985 |
+| MM |  |  | ✓ |  | gated | — | — | 0.0541 | 0.0874 | 0.0351 | 536705 |
 | MM |  | ✓ |  |  | gated | — | — | 0.0413 | 0.0702 | 0.0269 | 486785 |
+| MM |  | ✓ | ✓ |  | gated | — | — | 0.0704 | 0.1126 | 0.0461 | 619778 |
 | MM | ✓ |  | ✓ |  | gated | — | — | 0.0851 | 0.1237 | 0.0560 | 3096322 |
 | MM | ✓ | ✓ |  |  | gated | — | — | 0.0821 | 0.1176 | 0.0538 | 3046402 |
-| MM | ✓ | ✓ | ✓ |  | concat | — | — | 0.0890 ± 0.0046 | 0.1298 ± 0.0062 | 0.0582 ± 0.0030 | 3212288 |
+| MM | ✓ | ✓ | ✓ |  | concat | — | — | 0.0959 | 0.1390 | 0.0626 | 3212288 |
+| MM | ✓ | ✓ | ✓ |  | concat | 0.2 | — | 0.0992 | 0.1438 | 0.0644 | 3212288 |
+| MM | ✓ | ✓ | ✓ |  | gated | — | — | 0.0868 ± 0.0006 | 0.1267 ± 0.0008 | 0.0567 ± 0.0006 | 3179395 |
 | MM | ✓ | ✓ | ✓ |  | gated | 0.2 | — | 0.0902 ± 0.0012 | 0.1314 ± 0.0007 | 0.0591 ± 0.0005 | 3179395 |
 | MM | ✓ | ✓ | ✓ | ✓ | gated | — | — | 0.0879 | 0.1271 | 0.0574 | 3345668 |
 <!-- /TABLE:ABLATION -->
@@ -244,6 +259,8 @@ content quality).
 | Model | Cold Recall@10 | Cold Recall@20 | Cold NDCG@10 | Cold NDCG@20 | ColdOnly Recall@10 | ColdOnly Recall@20 | #users with cold target |
 |---|---|---|---|---|---|---|---|
 | MM-SASRec (text+image, gated) [cold10] | 0.0001 | 0.0001 | 0.0000 | 0.0000 | 0.0687 | 0.1092 | 12717 |
+| MM-SASRec (id+text+image, gated) [cold10] | 0.0002 | 0.0007 | 0.0001 | 0.0002 | 0.0646 | 0.0983 | 12717 |
+| MM-SASRec (id+text+image, gated) + ID-dropout 0.2 [cold10] | 0.0001 | 0.0008 | 0.0000 | 0.0002 | 0.0456 | 0.0789 | 12717 |
 | Random (uniform) [cold10] | 0.0013 | 0.0016 | 0.0006 | 0.0007 | 0.0036 | 0.0097 | 12717 |
 | SASRec (ID-only) [cold10] | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 12717 |
 <!-- /TABLE:COLD -->
@@ -252,6 +269,16 @@ The table above is the result: whether the ID-only model is exactly zero and how
 much the multimodal model recovers is read off it (and off the generated findings
 below), not remembered here. What the comparison is designed to test is that
 content features can do something the collaborative signal structurally cannot.
+
+Two things sit outside the headline and are reported because they are awkward
+for the story: the ID-dropout variant — the base-split headline config — is the
+**weakest** of the three content-capable cold runs (restricted Recall@20 0.0789
+vs 0.0983 for the same modality set without ID-dropout), so on this evidence
+ID-dropout trades away content reliance rather than strengthening it; and in
+*full*-catalogue ranking every model finds a cold target about once per thousand
+users, which is the honest end-to-end number for a protocol where the target has
+to beat all ~20 000 items. Each cold row is one seed, so both are directions to
+confirm rather than settled effects.
 
 Ranks use the **tie-neutral midpoint policy** (`docs/evaluation_protocol.md`):
 with an optimistic policy every cold item tied at score 0 would be reported as a
@@ -268,8 +295,12 @@ _Popularity rule: `frequency_quantile` (training interactions only)._
 | MM-SASRec (id+image, gated) | 0.2006 | 0.1182 | 0.0686 | 0.0948 | 0.0530 | 0.0283 |
 | MM-SASRec (id+text, gated) | 0.1936 | 0.1118 | 0.0632 | 0.0934 | 0.0497 | 0.0260 |
 | MM-SASRec (id+text+image+video, gated) | 0.2064 | 0.1233 | 0.0692 | 0.0985 | 0.0545 | 0.0279 |
+| MM-SASRec (image, gated) | 0.1989 | 0.0553 | 0.0194 | 0.0848 | 0.0184 | 0.0058 |
+| MM-SASRec (text+image, gated) | 0.2256 | 0.0999 | 0.0339 | 0.0990 | 0.0366 | 0.0109 |
 | MM-SASRec (text, gated) | 0.1736 | 0.0282 | 0.0130 | 0.0692 | 0.0089 | 0.0039 |
+| MM-SASRec (video, gated) | 0.2039 | 0.0715 | 0.0145 | 0.0856 | 0.0262 | 0.0047 |
 | MM-SASRec (id+text+image, concat) | 0.2135 | 0.1314 | 0.0867 | 0.1006 | 0.0585 | 0.0360 |
+| MM-SASRec (id+text+image, concat) + ID-dropout 0.2 | 0.2197 | 0.1385 | 0.0894 | 0.1029 | 0.0615 | 0.0368 |
 | MM-SASRec (id+text+image, gated) | 0.2103 ± 0.0045 | 0.1204 ± 0.0018 | 0.0670 ± 0.0036 | 0.0996 ± 0.0013 | 0.0527 ± 0.0007 | 0.0264 ± 0.0018 |
 | MM-SASRec (id+text+image, gated) + ID-dropout 0.2 | 0.2031 ± 0.0020 | 0.1270 ± 0.0045 | 0.0797 ± 0.0024 | 0.0968 ± 0.0008 | 0.0565 ± 0.0011 | 0.0321 ± 0.0013 |
 | Popular (train-freq) | 0.0106 | 0.0000 | 0.0000 | 0.0043 | 0.0000 | 0.0000 |
@@ -285,8 +316,12 @@ _Popularity rule: `frequency_quantile` (training interactions only)._
 | MM-SASRec (id+image, gated) | +0.0129 | -0.0003 | -0.0066 | +0.0053 | -0.0074 | -0.0108 |
 | MM-SASRec (id+text, gated) | +0.0058 | -0.0067 | -0.0120 | -0.0017 | -0.0138 | -0.0162 |
 | MM-SASRec (id+text+image+video, gated) | +0.0186 | +0.0048 | -0.0060 | +0.0111 | -0.0023 | -0.0102 |
+| MM-SASRec (image, gated) | +0.0111 | -0.0632 | -0.0558 | +0.0036 | -0.0703 | -0.0600 |
+| MM-SASRec (text+image, gated) | +0.0378 | -0.0186 | -0.0413 | +0.0303 | -0.0257 | -0.0455 |
 | MM-SASRec (text, gated) | -0.0142 | -0.0903 | -0.0622 | -0.0217 | -0.0974 | -0.0664 |
+| MM-SASRec (video, gated) | +0.0161 | -0.0470 | -0.0607 | +0.0086 | -0.0541 | -0.0649 |
 | MM-SASRec (id+text+image, concat) | +0.0257 | +0.0129 | +0.0115 | +0.0182 | +0.0058 | +0.0073 |
+| MM-SASRec (id+text+image, concat) + ID-dropout 0.2 | +0.0319 | +0.0200 | +0.0142 | +0.0244 | +0.0129 | +0.0100 |
 | MM-SASRec (id+text+image, gated) | +0.0225 | +0.0019 | -0.0082 | +0.0150 | -0.0052 | -0.0124 |
 | MM-SASRec (id+text+image, gated) + ID-dropout 0.2 | +0.0153 | +0.0085 | +0.0045 | +0.0078 | +0.0014 | +0.0003 |
 <!-- /TABLE:GAIN -->
@@ -304,24 +339,34 @@ that carry a `run_manifest.json` contribute; the plain-gated and ID-dropout
 variants are kept in separate rows because they answer different questions.
 
 <!-- TABLE:GATES -->
-_Mean over 9 documented run(s), from `results/tables/gate_by_bucket.csv`._
+_Mean over 13 documented run(s), from `results/tables/gate_by_bucket.csv`._
 
-| Model | Modality | Head | Middle | Tail |
-|---|---|---|---|---|
-| mm_sasrec(id+image) | id | 0.988 | 0.989 | 0.984 |
-| mm_sasrec(id+image) | image | 0.012 | 0.011 | 0.016 |
-| mm_sasrec(id+text) | id | 0.977 | 0.981 | 0.974 |
-| mm_sasrec(id+text) | text | 0.023 | 0.019 | 0.026 |
-| mm_sasrec(id+text+image) | id | 0.964 | 0.965 | 0.954 |
-| mm_sasrec(id+text+image) | image | 0.013 | 0.013 | 0.019 |
-| mm_sasrec(id+text+image) | text | 0.024 | 0.022 | 0.027 |
-| mm_sasrec(id+text+image+video) | id | 0.960 | 0.959 | 0.944 |
-| mm_sasrec(id+text+image+video) | image | 0.012 | 0.012 | 0.017 |
-| mm_sasrec(id+text+image+video) | text | 0.021 | 0.020 | 0.024 |
-| mm_sasrec(id+text+image+video) | video | 0.007 | 0.009 | 0.015 |
-| mm_sasrec_iddrop(id+text+image) | id | 0.967 | 0.961 | 0.939 |
-| mm_sasrec_iddrop(id+text+image) | image | 0.016 | 0.019 | 0.029 |
-| mm_sasrec_iddrop(id+text+image) | text | 0.017 | 0.020 | 0.033 |
+| Model | Modality | Head | Middle | Tail | Cold |
+|---|---|---|---|---|---|
+| mm_sasrec(id+image) | id | 0.988 | 0.989 | 0.984 | TBD |
+| mm_sasrec(id+image) | image | 0.012 | 0.011 | 0.016 | TBD |
+| mm_sasrec(id+text) | id | 0.977 | 0.981 | 0.974 | TBD |
+| mm_sasrec(id+text) | text | 0.023 | 0.019 | 0.026 | TBD |
+| mm_sasrec(id+text+image) | id | 0.964 | 0.965 | 0.954 | TBD |
+| mm_sasrec(id+text+image) | image | 0.013 | 0.013 | 0.019 | TBD |
+| mm_sasrec(id+text+image) | text | 0.024 | 0.022 | 0.027 | TBD |
+| mm_sasrec(id+text+image)@cold10 | id | 0.984 | 0.984 | 0.812 | 0.000 |
+| mm_sasrec(id+text+image)@cold10 | image | 0.006 | 0.006 | 0.087 | 0.480 |
+| mm_sasrec(id+text+image)@cold10 | text | 0.009 | 0.009 | 0.100 | 0.520 |
+| mm_sasrec(id+text+image+video) | id | 0.960 | 0.959 | 0.944 | TBD |
+| mm_sasrec(id+text+image+video) | image | 0.012 | 0.012 | 0.017 | TBD |
+| mm_sasrec(id+text+image+video) | text | 0.021 | 0.020 | 0.024 | TBD |
+| mm_sasrec(id+text+image+video) | video | 0.007 | 0.009 | 0.015 | TBD |
+| mm_sasrec(text+image) | image | 0.613 | 0.635 | 0.623 | TBD |
+| mm_sasrec(text+image) | text | 0.387 | 0.365 | 0.377 | TBD |
+| mm_sasrec(text+image)@cold10 | image | 0.652 | 0.665 | 0.651 | 0.641 |
+| mm_sasrec(text+image)@cold10 | text | 0.348 | 0.335 | 0.349 | 0.359 |
+| mm_sasrec_iddrop(id+text+image) | id | 0.967 | 0.961 | 0.939 | TBD |
+| mm_sasrec_iddrop(id+text+image) | image | 0.016 | 0.019 | 0.029 | TBD |
+| mm_sasrec_iddrop(id+text+image) | text | 0.017 | 0.020 | 0.033 | TBD |
+| mm_sasrec_iddrop(id+text+image)@cold10 | id | 0.969 | 0.963 | 0.785 | 0.000 |
+| mm_sasrec_iddrop(id+text+image)@cold10 | image | 0.013 | 0.015 | 0.150 | 0.797 |
+| mm_sasrec_iddrop(id+text+image)@cold10 | text | 0.018 | 0.022 | 0.065 | 0.203 |
 <!-- /TABLE:GATES -->
 
 If the ID gate dominates everywhere, that is the mechanism behind the plain-gated

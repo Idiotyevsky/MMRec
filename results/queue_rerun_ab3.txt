@@ -1,0 +1,6 @@
+# Phase 9 follow-up: fusion comparison at the regularised setting.
+# The staged ablation compares gated and concat at id_dropout 0; since concat
+# came out ahead there, this run asks the same question at the setting where
+# the gated model is strongest, so "which fusion wins" is not confounded with
+# "which one was given ID dropout".
+mm_concat_iddrop|configs/mm_sasrec_concat.yaml|model.id_dropout_prob=0.2

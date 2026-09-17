@@ -67,6 +67,7 @@ def label(row: dict) -> str:
 
 
 DEFAULT_KEY = ("dataset", "model", "fusion", "modalities", "id_dropout", "item_dropout")
+_KEY_LOWER = {k.lower() for k in DEFAULT_KEY}
 
 # Bookkeeping columns that identify a run rather than measure it: averaged or
 # copied into "x ± y" they would be nonsense (a mean seed? a mean parameter
@@ -80,6 +81,23 @@ IDENTITY_FIELDS = {
     "head_users", "middle_users", "tail_users",
     "ID", "Text", "Image", "Video",
 }
+_IDENTITY_LOWER = {c.lower() for c in IDENTITY_FIELDS}
+
+
+def field(row: dict, name: str):
+    """Case-insensitive field lookup.
+
+    ``ablation.csv`` names its fusion column ``Fusion`` while the other tables
+    use lowercase; a plain ``row.get("fusion")`` would return "" for every
+    ablation row and silently group gated and concat runs as one seed group.
+    """
+    if name in row:
+        return row[name]
+    low = name.lower()
+    for k, v in row.items():
+        if k.lower() == low:
+            return v
+    return ""
 
 
 def group_seeds(rows: list[dict], key_fields=DEFAULT_KEY) -> list[dict]:
@@ -90,13 +108,14 @@ def group_seeds(rows: list[dict], key_fields=DEFAULT_KEY) -> list[dict]:
     """
     groups: dict[tuple, list[dict]] = {}
     for r in rows:
-        groups.setdefault(tuple(r.get(k, "") for k in key_fields), []).append(r)
+        groups.setdefault(tuple(field(r, k) for k in key_fields), []).append(r)
     out = []
     for key, rs in groups.items():
         merged = dict(rs[0])
         if len(rs) > 1:
             for col in sorted({c for r in rs for c in r}):
-                if col in IDENTITY_FIELDS or col in key_fields or col == "n_seeds":
+                low = col.lower()
+                if low in _IDENTITY_LOWER or low == "n_seeds" or low in _KEY_LOWER:
                     continue
                 vals: list[float] = []
                 for r in rs:
@@ -549,9 +568,15 @@ def findings() -> str:
     base_lt = [r for r in long_tail if is_base(r)]
     id_lt = next((r for r in base_lt if r.get("model") == "sasrec"
                   and float(r.get("item_dropout") or 0) == 0), None)
+    # fusion is pinned: with it unpinned this picked whichever id+text+image
+    # row came first in the CSV, so the tail claim silently quoted concat while
+    # every other headline quotes the gated model
     mm_lt = next((r for r in base_lt if r.get("model") == "mm_sasrec"
-                  and r.get("modalities") == "id+text+image"
+                  and r.get("fusion") == "gated" and r.get("modalities") == "id+text+image"
                   and float(r.get("id_dropout") or 0) > 0), None)
+    concat_lt = next((r for r in base_lt if r.get("model") == "mm_sasrec"
+                      and r.get("fusion") == "concat" and r.get("modalities") == "id+text+image"
+                      and float(r.get("id_dropout") or 0) > 0), None)
     reg_lt = next((r for r in base_lt if r.get("model") == "sasrec"
                    and float(r.get("item_dropout") or 0) > 0), None)
     if id_lt and mm_lt:
@@ -571,6 +596,13 @@ def findings() -> str:
             + ", ".join(f"{b} {_spaced(_num(id_lt, f'{b}_users'))} users"
                         for b in ("head", "middle", "tail"))
             + "."
+            # fusion is not cosmetic for the tail: the concat variant is where
+            # the tail gain survives the regularisation control, so say so
+            + (f" Concat+ID-dropout 0.2 reaches tail "
+               f"{_num(concat_lt, 'tail_Recall@20'):.4f} "
+               f"({_gain(_num(concat_lt, 'tail_Recall@20'), _num(reg_lt, 'tail_Recall@20'))} "
+               f"vs the same dropout control)" if concat_lt and reg_lt else "")
+            + "."
         )
 
     if cold:
@@ -579,8 +611,13 @@ def findings() -> str:
         # the content-only row is the direct answer to "can content stand in";
         # the gated row is the headline model with its cold ID zeroed
         cold_content = _pick(cold, model="mm_sasrec", modalities="text+image")
+        # both gated variants are quoted: ID-dropout is the base-split headline
+        # config, but the plain gated run is the like-for-like comparison with
+        # the no-ID-dropout SASRec baseline, and the gap is itself the finding
+        cold_mm_plain = _pick(cold, model="mm_sasrec", modalities="id+text+image",
+                              id_dropout=0.0)
         cold_mm = (_pick(cold, model="mm_sasrec", modalities="id+text+image", id_dropout=0.2)
-                   or _pick(cold, model="mm_sasrec", modalities="id+text+image"))
+                   or cold_mm_plain)
         n_cold = _num(cold_mm or cold_content or cold_id or rand, "num_cold_items")
         chance = f"20/{int(n_cold)} = {20 / n_cold:.4f}" if n_cold else TBD
         line(
@@ -591,7 +628,10 @@ def findings() -> str:
             + (f", SASRec ID-only {_num(cold_id, 'ColdOnly Recall@20'):.4f}" if cold_id else "")
             + (f", content-only MM-SASRec {_num(cold_content, 'ColdOnly Recall@20'):.4f}"
                if cold_content else "")
-            + (f", gated MM-SASRec {_num(cold_mm, 'ColdOnly Recall@20'):.4f}" if cold_mm else "")
+            + (f", gated MM-SASRec {_num(cold_mm_plain or cold_mm, 'ColdOnly Recall@20'):.4f}"
+               if (cold_mm_plain or cold_mm) else "")
+            + (f" ({_num(cold_mm, 'ColdOnly Recall@20'):.4f} with ID-dropout 0.2)"
+               if cold_mm_plain and cold_mm else "")
             + "."
         )
 

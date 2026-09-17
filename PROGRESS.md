@@ -7,11 +7,10 @@ verified in this repository — no aspirational items.
 
 The project is in a **correctness-audit / re-run phase**. Two training-side bugs
 were found and fixed, every earlier run was quarantined as legacy, a provenance
-and aggregation guard layer was added, and the **main experiment matrix has been
-re-run to completion on the fixed code** (commit `cc06c20`, 14 runs, all three
-seeds per model). The modality/fusion ablation and the cold-item matrix are
-staged (`results/queue_rerun_ab*.txt`, `results/queue_rerun_cold.txt`) but not
-launched yet.
+and aggregation guard layer was added, and the **main experiment matrix, the
+modality/fusion ablation and the cold-item matrix have all been re-run to
+completion on the fixed code** (28 finished runs; the batches span six commits
+whose result-determining paths are byte-identical, see below).
 
 Numbers in the README are generated from `results/tables/*.csv`; numbers in
 `results/` are produced only by runs that carry a `run_manifest.json`.
@@ -19,7 +18,7 @@ Numbers in the README are generated from `results/tables/*.csv`; numbers in
 Headline result on the fixed code (test Recall@20, 100 000 evaluated users,
 3 seeds each): Popular `0.0036` < BPR-MF `0.0334` < SASRec `0.1224 ± 0.0020` <
 SASRec+item-dropout 0.2 `0.1283 ± 0.0009` < MM-SASRec gated+ID-dropout 0.2
-`0.1314 ± 0.0006`.
+`0.1314 ± 0.0006` < MM-SASRec concat+ID-dropout 0.2 `0.1438` (1 seed).
 
 ## Completed
 
@@ -102,6 +101,48 @@ SASRec+item-dropout 0.2 `0.1283 ± 0.0009` < MM-SASRec gated+ID-dropout 0.2
 - **Gate analysis** (`analysis/analyze_gates.py`) — only documented runs
   contribute to `results/tables/gate_by_bucket.csv`; plain-gated and ID-dropout
   variants are separate rows.
+- **Modality / fusion ablation (Phase 9) — finished.** 9 base-split runs at the
+  regularised setting plus the fusion follow-up (`results/queue_rerun_ab3.txt`).
+  Content-only modality sets (test Recall@20, 1 seed): text `0.0702`, image
+  `0.0874`, video `0.0905`, text+image `0.1126`; paired with ID: id+text
+  `0.1176`, id+image `0.1237`; the full gated set `0.1267 ± 0.0008` (3 seeds);
+  adding video to id+text+image `0.1271` (1 seed, within the multi-seed std).
+  Fusion at the same modality set and regularisation: concat `0.1390` /
+  concat+ID-dropout 0.2 `0.1438` vs gated `0.1267` / `0.1314 ± 0.0006` — the
+  fusion choice matters more than the modality set, and this is reported as
+  measured, not folded into the gated headline.
+- **Cold-item matrix (Phase 10) — finished.** All five cold10 runs carry a
+  manifest. Cold-only Recall@20 (ranking restricted to the 1 974 cold items,
+  12 717 users with a cold target): Random `0.0097` (closed form `0.01013`),
+  SASRec ID-only `0.0000`, content-only text+image `0.1092`, gated
+  id+text+image `0.0983`, gated+ID-dropout 0.2 `0.0789`. In the *full*-catalogue
+  ranking the same runs score `0.0000–0.0008`: a cold target has to beat all
+  19 738 items, which is where the honest end-to-end number lives. Gate export
+  on the cold runs shows the designed zeroing directly — cold items get ID gate
+  weight exactly `0.000`, and the content weight splits image/text `0.480/0.520`
+  (plain gated) and `0.797/0.203` (ID-dropout).
+- **Gate re-export for the new runs (Phase 11)** — `analyze_gates.py` now keys
+  each row by `model(modalities)@dataset`, so ablation and cold exports can
+  never be averaged into the base gated rows (13 documented runs).
+- **Result-determining-code equivalence across batches** — the 28 runs span six
+  commits, but `git diff --name-only <sha> 45901ec -- src scripts configs
+  pyproject.toml` is empty for every one of them, i.e. every run executed
+  byte-identical training/eval code; the aggregator confirms this by pooling all
+  28 with no run dropped.
+- **Three table-integrity bugs found and fixed (all caught by the generated
+  tables, all now pinned by tests)**
+  - `group_seeds()` keyed on lowercase `fusion` while `ablation.csv` writes
+    `Fusion`, so gated and concat runs at the same modality set were averaged
+    into one `n_seeds: 4` row and the gated ID-dropout rows dropped out of the
+    ABLATION table. The lookup is now case-insensitive
+    (`analysis/make_readme_tables.py::field`).
+  - The long-tail headline picked the first `id+text+image` row with ID-dropout
+    > 0, which was the **concat** run, while every other headline quotes the
+    gated model; fusion is now pinned and the concat tail is reported as its own
+    clause.
+  - The cold claim silently quoted whichever gated variant was picked; it now
+    names both (plain gated and ID-dropout 0.2), since the gap between them is
+    itself the finding.
 - **Generated README** — `analysis/make_readme_tables.py` renders every results
   table *and* the key-findings text from `results/tables/*.csv`;
   `analysis/update_readme.py` injects them between markers and has a `--check`
@@ -114,9 +155,9 @@ SASRec+item-dropout 0.2 `0.1283 ± 0.0009` < MM-SASRec gated+ID-dropout 0.2
 
 ## Verified
 
-- `pytest -q` → 153 passed (unit + regression tests for both training bugs,
-  provenance and aggregation guards, the README generator, and the Random
-  baseline's closed-form cold floor).
+- `pytest -q` → 164 passed (unit + regression tests for both training bugs,
+  provenance and aggregation guards, the README generator, the table-integrity
+  guards, and the Random baseline's closed-form cold floor).
 - `python scripts/smoke_test.py` → 14 checks pass on synthetic data: ordering
   `popular < BPR-MF < SASRec`, losses decrease, tiny-overfit reaches < 0.15
   loss, position-wise objective beats the broadcast-objective reference.
@@ -131,6 +172,9 @@ SASRec+item-dropout 0.2 `0.1283 ± 0.0009` < MM-SASRec gated+ID-dropout 0.2
   `run_manifest.json` reproduce exactly from the run's own `config.yaml`.
 - All 14 main-matrix manifests carry `git_sha = cc06c20` with
   `git_dirty = False` — the batch ran on one committed code version.
+- All 28 manifests (main matrix + ablation + cold + the fusion follow-up) carry
+  `git_dirty = False`, and their SHAs' result-determining paths are identical to
+  `45901ec`, so no table pools code that differs while training.
 - Gate analysis on all 6 MM runs (`gate_weights.npz` exported per run and read
   back from the checkpoint, never recomputed): the ID gate dominates
   (~0.96) and is lowest on tail items, while text/image weights rise toward the
@@ -163,22 +207,28 @@ SASRec+item-dropout 0.2 `0.1283 ± 0.0009` < MM-SASRec gated+ID-dropout 0.2
 | B: SASRec + item-dropout 0.2 (3 seeds) | 3 | **finished** |
 | C: MM-SASRec gated id+text+image (3 seeds) | 3 | **finished** |
 | D: MM-SASRec gated + ID-dropout 0.2 (3 seeds) | 3 | **finished** |
-| modality / fusion ablation (base) | 8 | queued (`queue_rerun_ab1/2.txt`) |
-| cold split (Random, SASRec, content-only, gated, gated+ID-dropout) | 5 | queued (`queue_rerun_cold.txt`) |
+| modality / fusion ablation (base) | 9 | **finished** (`queue_rerun_ab1/2/3.txt`) |
+| cold split (Random, SASRec, content-only, gated, gated+ID-dropout) | 5 | **finished** (`queue_rerun_cold.txt`) |
 | Semantic-ID extension | — | paused until the discriminative results stabilise |
 
 Queues: `results/queue_main_{a,b,c,d}.txt` (GPU 1/2/3/5) — finished.
+Total finished runs entering the tables: 28 (all with `run_manifest.json`).
 
 ## Next highest-priority tasks
 
-1. Launch the staged ablation and cold queues on the fixed code; re-export
-   gates for the ablation runs.
-2. Check the measured Random cold-only Recall@20 against the closed form
-   20/1974 and record the comparison in the generated findings.
+1. ~~Launch the staged ablation and cold queues on the fixed code; re-export
+   gates for the ablation runs~~ — done, 15 runs finished, gates re-exported.
+2. ~~Check the measured Random cold-only Recall@20 against the closed form
+   20/1974 and record the comparison in the generated findings~~ — done,
+   `0.0097` vs `0.0101`, documented in `docs/evaluation_protocol.md` and the
+   generated cold finding.
 3. ~~Re-run the retrieval benchmark on the fixed code with the new MM
    checkpoint~~ — already satisfied: the committed
    `results/retrieval_benchmarks/mm_gated_20260917-053644_dfe900.json` names a
    `cc06c20` run (`git_dirty = False`), i.e. it was measured on the fixed code.
-4. Update the README's modality/fusion and cold sections once the runs land —
-   the numbers come from `results/tables/*.csv`, so only the queues need care.
-5. Semantic-ID extension (RQVAE + constrained generative decoding).
+4. ~~Update the README's modality/fusion and cold sections once the runs land~~ —
+   done; every number is generated from `results/tables/*.csv` and
+   `update_readme.py --check` passes.
+5. Multi-seed the concat fusion and the cold content-only rows if the single-seed
+   spread turns out to matter for the fusion conclusion (currently 1 seed each).
+6. Semantic-ID extension (RQVAE + constrained generative decoding).

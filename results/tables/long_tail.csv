@@ -3,8 +3,12 @@ bpr,bpr,base,-,-,42,0.0,0.0,frequency_quantile,33521,0.071895,0.028933,21904,0.0
 ab_id_image,mm_sasrec,base,gated,id+image,42,0.0,0.0,frequency_quantile,33521,0.20065,0.094803,21904,0.118243,0.052961,44575,0.068559,0.028294,ab_id_image_20260917-072250_7c02de
 ab_id_text,mm_sasrec,base,gated,id+text,42,0.0,0.0,frequency_quantile,33521,0.19364,0.0934,21904,0.111806,0.04973,44575,0.063197,0.025987,ab_id_text_20260917-070902_10b539
 ab_id_text_image_video,mm_sasrec,base,gated,id+text+image+video,42,0.0,0.0,frequency_quantile,33521,0.206438,0.098483,21904,0.123311,0.054459,44575,0.069232,0.027946,ab_id_text_image_video_20260917-073834_5fb438
+ab_image_only,mm_sasrec,base,gated,image,42,0.0,0.0,frequency_quantile,33521,0.19886,0.084847,21904,0.055332,0.018387,44575,0.019428,0.005812,ab_image_only_20260917-075006_92314a
+ab_text_image,mm_sasrec,base,gated,text+image,42,0.0,0.0,frequency_quantile,33521,0.22559,0.099049,21904,0.09989,0.036581,44575,0.033853,0.010877,ab_text_image_20260917-093335_5dc04b
 ab_text_only,mm_sasrec,base,gated,text,42,0.0,0.0,frequency_quantile,33521,0.173593,0.069243,21904,0.028214,0.008926,44575,0.012967,0.003893,ab_text_only_20260917-070852_1dbaae
+ab_video_only,mm_sasrec,base,gated,video,42,0.0,0.0,frequency_quantile,33521,0.203872,0.085562,21904,0.071539,0.02624,44575,0.01447,0.004713,ab_video_only_20260917-084357_3c9f50
 mm_concat,mm_sasrec,base,concat,id+text+image,42,0.0,0.0,frequency_quantile,33521,0.213538,0.100587,21904,0.131392,0.05848,44575,0.08673,0.035974,mm_concat_20260917-075552_b84b95
+mm_concat_iddrop,mm_sasrec,base,concat,id+text+image,42,0.2,0.0,frequency_quantile,33521,0.219743,0.102865,21904,0.138514,0.061548,44575,0.089355,0.03679,mm_concat_iddrop_20260917-082810_d41504
 mm_gated,mm_sasrec,base,gated,id+text+image,42,0.0,0.0,frequency_quantile,33521,0.215447,0.100994,21904,0.120982,0.052914,44575,0.063915,0.024783,mm_gated_20260917-053644_dfe900
 mm_gated_iddrop,mm_sasrec,base,gated,id+text+image,42,0.2,0.0,frequency_quantile,33521,0.204767,0.096634,21904,0.1271,0.056474,44575,0.077757,0.030924,mm_gated_iddrop_20260917-053644_ec427f
 mm_gated_iddrop_s2026,mm_sasrec,base,gated,id+text+image,2026,0.2,0.0,frequency_quantile,33521,0.203604,0.097592,21904,0.131392,0.05757,44575,0.079035,0.031855,mm_gated_iddrop_s2026_20260917-060143_87b54b
@@ -19,5 +23,7 @@ sasrec_itemdrop_s3407,sasrec,base,-,id,3407,0.0,0.2,frequency_quantile,33521,0.1
 sasrec_s2026,sasrec,base,-,id,2026,0.0,0.0,frequency_quantile,33521,0.185197,0.087412,21904,0.114637,0.051836,44575,0.074661,0.032648,sasrec_s2026_20260917-060412_61f903
 sasrec_s3407,sasrec,base,-,id,3407,0.0,0.0,frequency_quantile,33521,0.185645,0.086727,21904,0.117924,0.05332,44575,0.075087,0.032327,sasrec_s3407_20260917-062531_92799b
 cold_content_only,mm_sasrec,cold10,gated,text+image,42,0.0,0.0,frequency_quantile,31459,0.220319,0.097764,21629,0.093902,0.033632,46854,0.022175,0.007119,cold_content_only_20260917-072548_328748
+cold_mm_gated,mm_sasrec,cold10,gated,id+text+image,42,0.0,0.0,frequency_quantile,31459,0.205251,0.09886,21629,0.112072,0.047088,46854,0.038609,0.015595,cold_mm_gated_20260917-082446_fca8e2
+cold_mm_gated_iddrop,mm_sasrec,cold10,gated,id+text+image,42,0.2,0.0,frequency_quantile,31459,0.202073,0.098694,21629,0.13112,0.056268,46854,0.049537,0.020638,cold_mm_gated_iddrop_20260917-083811_f03665
 cold_random,random,cold10,-,-,42,0.0,0.0,frequency_quantile,31459,0.000445,0.000172,21629,0.000185,4.4e-05,46854,0.001387,0.000706,cold_random_20260917-070905_51288e
 cold_sasrec,sasrec,cold10,-,id,42,0.0,0.0,frequency_quantile,31459,0.187291,0.090578,21629,0.121596,0.054288,46854,0.045973,0.019205,cold_sasrec_20260917-070922_0b881a
