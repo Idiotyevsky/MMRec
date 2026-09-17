@@ -510,6 +510,8 @@ def findings() -> str:
                      id_dropout=0.0)
     mm_concat = _pick(base, model="mm_sasrec", fusion="concat", modalities="id+text+image",
                       id_dropout=0.0)
+    mm_concat_reg = _pick(base, model="mm_sasrec", fusion="concat", modalities="id+text+image",
+                          id_dropout=0.2)
     reg = _pick(base, model="sasrec", item_dropout=0.2)
     idonly = next((r for r in base if r.get("model") == "sasrec"
                    and float(r.get("item_dropout") or 0) == 0), None)
@@ -563,6 +565,12 @@ def findings() -> str:
             f"{_num(idonly, 'Recall@20'):.4f} (same {users} users); "
             f"Δ vs ID-only gated {_gain(_num(mm_plain, 'Recall@20'), _num(idonly, 'Recall@20'))}, "
             f"concat {_gain(_num(mm_concat, 'Recall@20'), _num(idonly, 'Recall@20'))}."
+            # asked at both settings on purpose: at ID-dropout 0 the comparison
+            # is confounded with "which model was given the dropout", and the
+            # follow-up run exists so the answer does not depend on that choice
+            + (f" With ID-dropout 0.2 the order is unchanged: gated "
+               f"{_num(mm, 'Recall@20'):.4f} vs concat {_num(mm_concat_reg, 'Recall@20'):.4f}."
+               if mm and mm_concat_reg else "")
         )
 
     base_lt = [r for r in long_tail if is_base(r)]

@@ -146,6 +146,11 @@ SASRec+item-dropout 0.2 `0.1283 ± 0.0009` < MM-SASRec gated+ID-dropout 0.2
   - The cold claim silently quoted whichever gated variant was picked; it now
     names both (plain gated and ID-dropout 0.2), since the gap between them is
     itself the finding.
+- **Case study regenerated on the fixed code** — the committed
+  `results/case_study.{md,json}` quoted two pre-fix runs (which the legacy
+  README had already flagged as invalid). It is now measured from the seed-42
+  `sasrec` and `mm_gated_iddrop` checkpoints, and its Recall@20 values match
+  those runs' own `metrics.json`.
 - **Generated README** — `analysis/make_readme_tables.py` renders every results
   table *and* the key-findings text from `results/tables/*.csv`;
   `analysis/update_readme.py` injects them between markers and has a `--check`

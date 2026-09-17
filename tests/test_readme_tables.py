@@ -152,6 +152,28 @@ def test_findings_quote_the_headline_mm_row_not_an_ablation_row(tables):
     assert "0.9999" not in text
 
 
+def test_fusion_claim_is_asked_at_both_regularisation_settings(tables):
+    """The concat/gated question is only clean if both sides are also compared
+    with ID dropout on; quoting the plain setting alone confounds fusion with
+    which model was given the dropout."""
+    concat = _mm_row("mm_concat", "id+text+image", "0.0", "0.1390")
+    concat["fusion"] = "concat"
+    concat_reg = _mm_row("mm_concat_iddrop", "id+text+image", "0.2", "0.1438")
+    concat_reg["fusion"] = "concat"
+    _write(tables, "overall.csv", [
+        _overall_row("popular", "popular", 42, "0.0036", "0.0014"),
+        _overall_row("bpr", "bpr", 42, "0.0334", "0.0131"),
+        _overall_row("sasrec", "sasrec", 42, "0.1224", "0.0557"),
+        _mm_row("mm_gated", "id+text+image", "0.0", "0.1267"),
+        concat,
+        _mm_row("mm_gated_iddrop", "id+text+image", "0.2", "0.1314"),
+        concat_reg,
+    ], OVERALL_FIELDS)
+    text = mrt.findings()
+    assert "gated 0.1267 vs concat 0.1390" in text
+    assert "gated 0.1314 vs concat 0.1438" in text
+
+
 def test_long_tail_findings_quote_the_headline_mm_row(tables):
     def lt_row(tag, modalities, id_dropout, recall20):
         return {

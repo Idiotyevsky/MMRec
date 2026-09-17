@@ -1,0 +1,10 @@
+# The fusion comparison is the one headline whose winning side is single-seed:
+# concat 0.1390 / concat+ID-dropout 0.1438 (seed 42) vs gated 0.1267 / 0.1314
+# (3 seeds each).  The gap is an order of magnitude above the gated seed spread,
+# but "concat wins" should not rest on one run, so both concat settings get the
+# same seeds the gated settings got.  Note the queue runner splits the third
+# column on '@', so a seed and a dotted override are chained with '@' as well.
+mm_concat_s2026|configs/mm_sasrec_concat.yaml|--seed@2026
+mm_concat_s3407|configs/mm_sasrec_concat.yaml|--seed@3407
+mm_concat_iddrop_s2026|configs/mm_sasrec_concat.yaml|--seed@2026@model.id_dropout_prob=0.2
+mm_concat_iddrop_s3407|configs/mm_sasrec_concat.yaml|--seed@3407@model.id_dropout_prob=0.2
