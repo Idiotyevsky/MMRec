@@ -1,4 +1,6 @@
 model,dataset,modalities,ID,Text,Image,Video,Fusion,item_dropout,id_dropout,modality_dropout,Recall@20,NDCG@20,Recall@10,NDCG@10,params,seed,tag,run_id
+mm_sasrec,base,id+text+image+video,1,1,1,1,gated,0.0,0.0,0.0,0.12707,0.057398,0.08787,0.047526,3345668,42,ab_id_text_image_video,ab_id_text_image_video_20260917-073834_5fb438
+mm_sasrec,base,id+text+image,1,1,1,0,concat,0.0,0.0,0.0,0.13902,0.062563,0.09585,0.0517,3212288,42,mm_concat,mm_concat_20260917-075552_b84b95
 mm_sasrec,base,id+text+image,1,1,1,0,gated,0.0,0.0,0.0,0.12721,0.056491,0.08641,0.046219,3179395,42,mm_gated,mm_gated_20260917-053644_dfe900
 mm_sasrec,base,id+text+image,1,1,1,0,gated,0.0,0.2,0.0,0.13114,0.058547,0.08891,0.047924,3179395,42,mm_gated_iddrop,mm_gated_iddrop_20260917-053644_ec427f
 mm_sasrec,base,id+text+image,1,1,1,0,gated,0.0,0.2,0.0,0.13226,0.059523,0.0905,0.049015,3179395,2026,mm_gated_iddrop_s2026,mm_gated_iddrop_s2026_20260917-060143_87b54b
@@ -13,4 +15,6 @@ sasrec,base,id,1,0,0,0,-,0.2,0.0,0.0,0.12943,0.05782,0.08913,0.047685,2929920,20
 sasrec,base,id,1,0,0,0,-,0.2,0.0,0.0,0.12716,0.058045,0.0876,0.048079,2929920,3407,sasrec_itemdrop_s3407,sasrec_itemdrop_s3407_20260917-061912_d426c1
 sasrec,base,id,1,0,0,0,-,0.0,0.0,0.0,0.12047,0.055209,0.08443,0.046144,2929792,2026,sasrec_s2026,sasrec_s2026_20260917-060412_61f903
 sasrec,base,id,1,0,0,0,-,0.0,0.0,0.0,0.12153,0.055161,0.08454,0.045829,2929792,3407,sasrec_s3407,sasrec_s3407_20260917-062531_92799b
+mm_sasrec,base,text,0,1,0,0,gated,0.0,0.0,0.0,0.07015,0.026901,0.04128,0.019638,486785,42,ab_text_only,ab_text_only_20260917-070852_1dbaae
+mm_sasrec,cold10,text+image,0,1,1,0,gated,0.0,0.0,0.0,0.100068,0.041389,0.063037,0.032102,619778,42,cold_content_only,cold_content_only_20260917-072548_328748
 sasrec,cold10,id,1,0,0,0,-,0.0,0.0,0.0,0.106822,0.049264,0.076034,0.041515,2929792,42,cold_sasrec,cold_sasrec_20260917-070922_0b881a

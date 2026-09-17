@@ -1,9 +1,13 @@
 run_id,tag,model,dataset,fusion,modalities,seed,id_dropout,item_dropout,params,git_sha,git_dirty,dataset_hash,config_hash,best_epoch,epochs,train_time_s,provenance
 ab_id_image_20260917-072250_7c02de,ab_id_image,mm_sasrec,base,gated,id+image,42,0.0,0.0,3096322,45901ec14472b395e4e9454db3308bf8067ed31a,False,71a1309e99c48ae9faf3d22bfc3aa081,d60404ce60d6b366,31,52,919.965232,True
 ab_id_text_20260917-070902_10b539,ab_id_text,mm_sasrec,base,gated,id+text,42,0.0,0.0,3046402,6ae6a69e174329e2ef7a553c838ec269683b4789,False,71a1309e99c48ae9faf3d22bfc3aa081,8a85f3a6b4d1d441,28,49,806.37699,True
+ab_id_text_image_video_20260917-073834_5fb438,ab_id_text_image_video,mm_sasrec,base,gated,id+text+image+video,42,0.0,0.0,3345668,7e61619aea2bf1a5fd5d9622ea22061ad9feaa97,False,71a1309e99c48ae9faf3d22bfc3aa081,83e12f0a9d7a3789,25,46,1013.550137,True
+ab_text_only_20260917-070852_1dbaae,ab_text_only,mm_sasrec,base,gated,text,42,0.0,0.0,486785,6ae6a69e174329e2ef7a553c838ec269683b4789,False,71a1309e99c48ae9faf3d22bfc3aa081,b2c1f444803facc5,135,156,2451.190063,True
 bpr_20260917-052736_83d397,bpr,bpr,base,-,-,42,0.0,0.0,15326720,cc06c207bea3bf71088310caaccbe2d3b61d1d07,False,71a1309e99c48ae9faf3d22bfc3aa081,ef6ed64249d6a079,299,300,2174.595839,True
+cold_content_only_20260917-072548_328748,cold_content_only,mm_sasrec,cold10,gated,text+image,42,0.0,0.0,619778,45901ec14472b395e4e9454db3308bf8067ed31a,False,b1f697457cc4864cf9bb2d6a255dc62a,c6c3a5215d9bd50a,194,200,3506.574486,True
 cold_random_20260917-070905_51288e,cold_random,random,cold10,-,-,42,0.0,0.0,0,6ae6a69e174329e2ef7a553c838ec269683b4789,False,b1f697457cc4864cf9bb2d6a255dc62a,ed7e05fb1eb4f298,0,1,2.491887,True
 cold_sasrec_20260917-070922_0b881a,cold_sasrec,sasrec,cold10,-,id,42,0.0,0.0,2929792,6ae6a69e174329e2ef7a553c838ec269683b4789,False,b1f697457cc4864cf9bb2d6a255dc62a,9cbe69635c7a0c43,46,67,955.904705,True
+mm_concat_20260917-075552_b84b95,mm_concat,mm_sasrec,base,concat,id+text+image,42,0.0,0.0,3212288,c448e674cdc5e462ee88d8faa04c73bd96d7aff6,False,71a1309e99c48ae9faf3d22bfc3aa081,9b48f4377e5b3f19,63,84,1472.69374,True
 mm_gated_20260917-053644_dfe900,mm_gated,mm_sasrec,base,gated,id+text+image,42,0.0,0.0,3179395,cc06c207bea3bf71088310caaccbe2d3b61d1d07,False,71a1309e99c48ae9faf3d22bfc3aa081,34f7c99959261ad0,20,41,790.962283,True
 mm_gated_s2026_20260917-055019_00d3df,mm_gated_s2026,mm_sasrec,base,gated,id+text+image,2026,0.0,0.0,3179395,cc06c207bea3bf71088310caaccbe2d3b61d1d07,False,71a1309e99c48ae9faf3d22bfc3aa081,62bbb9a54ad03df4,21,42,744.660624,True
 mm_gated_s3407_20260917-060306_0cecfd,mm_gated_s3407,mm_sasrec,base,gated,id+text+image,3407,0.0,0.0,3179395,cc06c207bea3bf71088310caaccbe2d3b61d1d07,False,71a1309e99c48ae9faf3d22bfc3aa081,fb3809945ce05cb0,21,42,774.847737,True
