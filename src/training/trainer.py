@@ -23,7 +23,7 @@ import torch
 from torch.utils.data import DataLoader
 
 from ..data.dataset import EvalDataset, ProcessedData, TrainDataset, collate_eval, collate_train
-from ..data.negative_sampler import NegativeSampler
+from ..data.negative_sampler import NegativeSampler, build_training_interaction_keys
 from ..evaluation.evaluator import FullRankingEvaluator
 from ..models.bpr import bpr_loss
 from ..models.loss import sampled_softmax_loss
@@ -70,11 +70,12 @@ class Trainer:
         self.in_batch_negatives = bool(l.get("in_batch_negatives", False))
 
         ns = cfg.get("negative_sampling", {}) or {}
+        # train-prefix interactions only: val/test targets must stay reachable.
         self.sampler = NegativeSampler(
             num_items=data.num_items,
             train_freq=data.train_freq,
-            all_interactions=NegativeSampler.build_interaction_keys(
-                data.flat_items, data.user_offsets, data.num_items
+            all_interactions=build_training_interaction_keys(
+                data.flat_items, data.user_offsets, data.train_len, data.num_items
             ),
             mode=str(ns.get("mode", "uniform")),
             popularity_power=float(ns.get("popularity_power", 0.75)),
@@ -204,20 +205,32 @@ class Trainer:
                     loss = bpr_loss(
                         (user_repr * pos_emb).sum(-1), (user_repr * neg_emb).sum(-1)
                     )
-                    pos_emb = pos_emb.unsqueeze(1)
+                    pos_score = (user_repr * pos_emb).sum(-1).mean()
                 else:
-                    user_repr = self.model.encode(input_ids)
+                    # every position is scored with its own hidden state:
+                    # h_{b,l} predicts target_{b,l} (standard SASRec objective).
+                    seq_repr = self.model.encode_sequence(input_ids)
                     pos_emb, _ = self.model.item_embeddings(target)
                     neg_emb, _ = self.model.item_embeddings(neg_ids_t)
-                    ib_emb = pos_emb.detach() if self.in_batch_negatives else None
+                    ib_emb = None
+                    if self.in_batch_negatives and input_ids.shape[0] > 1:
+                        # other users' positives: roll by one so no row sees its
+                        # own targets (queries and keys differ per row)
+                        ib_emb = pos_emb.roll(shifts=1, dims=0).detach()
                     loss = sampled_softmax_loss(
-                        user_repr,
+                        seq_repr,
                         pos_emb,
                         neg_emb,
-                        input_ids,
+                        target,
                         temperature=self.temperature,
-                        in_batch_pos_emb=ib_emb,
+                        in_batch_neg_emb=ib_emb,
                     )
+                    with torch.no_grad():
+                        valid = (target != 0).to(seq_repr.dtype)
+                        pos_score = (
+                            ((seq_repr * pos_emb).sum(-1) * valid).sum()
+                            / valid.sum().clamp(min=1.0)
+                        )
 
             if not torch.isfinite(loss):
                 raise FloatingPointError(f"non-finite loss at epoch {epoch}, step {self.global_step}")
@@ -229,12 +242,6 @@ class Trainer:
                     torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.max_grad_norm)
                 self.scaler.step(self.optimizer)
                 self.scaler.update()
-
-            with torch.no_grad():
-                mask = (input_ids != 0).to(user_repr.dtype)
-                pos_score = (
-                    ((user_repr.unsqueeze(1) * pos_emb).sum(-1) * mask).sum() / mask.sum().clamp(min=1.0)
-                )
 
             totals["loss"] += float(loss.detach()) * input_ids.shape[0]
             totals["pos_score"] += float(pos_score) * input_ids.shape[0]

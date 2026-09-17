@@ -64,6 +64,30 @@ def run_model(name: str, d: Path, data: ProcessedData, device, run_dir: Path, **
     m = res.metrics()
     m["train_loss_last"] = trainer.history[-1].get("train_loss")
     m["train_loss_first"] = trainer.history[0].get("train_loss")
+
+    # Which objective did training actually optimise?  A model trained with the
+    # position-wise SASRec objective must score better under it than under the
+    # "broadcast the last hidden state" objective, and vice versa for the bug.
+    if name not in ("popular", "bpr"):
+        from src.models.loss import sampled_softmax_loss
+
+        model.eval()
+        pos_l, bcast_l = [], []
+        with torch.no_grad():
+            for batch in trainer._train_loader():
+                ids = batch["input_ids"].to(device)
+                tgt = batch["target"].to(device)
+                neg, _ = model.item_embeddings(
+                    torch.randint(1, data.num_items + 1, (ids.shape[0], 32), device=device)
+                )
+                pe, _ = model.item_embeddings(tgt)
+                seq = model.encode_sequence(ids)
+                pos_l.append(sampled_softmax_loss(seq, pe, neg, tgt).item())
+                bcast_l.append(
+                    sampled_softmax_loss(seq[:, -1:].expand_as(seq), pe, neg, tgt).item()
+                )
+        m["poswise_loss"] = float(np.mean(pos_l))
+        m["broadcast_loss"] = float(np.mean(bcast_l))
     return m
 
 
@@ -76,8 +100,11 @@ def main() -> None:
     set_seed(0)
     device = torch.device(args.device)
     tmp = Path(tempfile.mkdtemp(prefix="mmrec_smoke_"))
+    # sequential structure is required for "SASRec > Popular" to be a meaningful
+    # check: on i.i.d. data the popularity marginal *is* the Bayes-optimal model
     d = make_synthetic_dataset(tmp / "data", num_users=300, num_items=120,
-                               min_len=5, max_len=15, cold_ratio=0.0, seed=0)
+                               min_len=5, max_len=15, cold_ratio=0.0,
+                               structure="sequential", seed=0)
     data = ProcessedData.load(d)
     print(f"synthetic dataset: {data.summary()}")
 
@@ -99,8 +126,12 @@ def main() -> None:
         print(f"\n>>> {key}")
         m = run_model(name, d, data, device, tmp / key, **kw)
         results[key] = m
-        print(f"    Recall@20={m['Recall@20']:.4f}  NDCG@20={m['NDCG@20']:.4f}  "
-              f"loss {m['train_loss_first']:.3f} -> {m['train_loss_last']:.3f}")
+        loss_txt = (
+            "loss n/a (parameter-free)"
+            if m["train_loss_first"] is None
+            else f"loss {m['train_loss_first']:.3f} -> {m['train_loss_last']:.3f}"
+        )
+        print(f"    Recall@20={m['Recall@20']:.4f}  NDCG@20={m['NDCG@20']:.4f}  {loss_txt}")
 
     # ---- ordering constraints ------------------------------------------
     checks: list[tuple[str, bool, str]] = []
@@ -125,6 +156,13 @@ def main() -> None:
                            results[key]["train_loss_last"] < results[key]["train_loss_first"],
                            f"{results[key]['train_loss_first']:.3f} -> "
                            f"{results[key]['train_loss_last']:.3f}"))
+
+    # the objective the model was trained on must be the position-wise one
+    for key, m in results.items():
+        if "poswise_loss" in m:
+            checks.append((f"{key} position-wise objective",
+                           m["poswise_loss"] < m["broadcast_loss"],
+                           f"{m['poswise_loss']:.4f} < {m['broadcast_loss']:.4f}"))
 
     print("\n=== sanity checks ===")
     ok = True

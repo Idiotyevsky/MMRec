@@ -168,9 +168,20 @@ class SASRec(nn.Module):
             e = torch.where(drop.unsqueeze(-1), self.mask_embedding.expand_as(e), e)
         return e, {}
 
-    def encode(self, input_ids: torch.Tensor) -> torch.Tensor:
+    def encode_sequence(self, input_ids: torch.Tensor) -> torch.Tensor:
+        """Hidden state of *every* position, ``(B, L, H)``.
+
+        Training must use this: with left padding, position ``l`` has only seen
+        tokens ``<= l``, so ``sequence_repr[:, l]`` is the state that predicts
+        ``target[:, l]``.  Collapsing to the last state would score every target
+        from the same vector, which is a different (and much easier) objective.
+        """
         emb, _ = self.item_embeddings(input_ids)
-        return self.encoder(self.dropout(emb), input_ids)
+        return self.encoder(self.dropout(emb), input_ids, return_sequence=True)
+
+    def encode(self, input_ids: torch.Tensor) -> torch.Tensor:
+        """User representation for *inference*: the last (most recent) position."""
+        return self.encode_sequence(input_ids)[:, -1]
 
     def forward(self, input_ids: torch.Tensor) -> torch.Tensor:
         return self.encode(input_ids)

@@ -75,9 +75,14 @@ class MMSASRec(nn.Module):
         """Return ``(embeddings, gate_weights)`` for arbitrary item ids."""
         return self.item_encoder(item_ids, generator=generator)
 
-    def encode(self, input_ids: torch.Tensor) -> torch.Tensor:
+    def encode_sequence(self, input_ids: torch.Tensor) -> torch.Tensor:
+        """Hidden state of *every* position, ``(B, L, H)`` (training objective)."""
         emb, _ = self.item_encoder(input_ids)
-        return self.encoder(self.dropout(emb), input_ids)
+        return self.encoder(self.dropout(emb), input_ids, return_sequence=True)
+
+    def encode(self, input_ids: torch.Tensor) -> torch.Tensor:
+        """User representation for *inference*: the last (most recent) position."""
+        return self.encode_sequence(input_ids)[:, -1]
 
     def forward(self, input_ids: torch.Tensor) -> torch.Tensor:
         return self.encode(input_ids)

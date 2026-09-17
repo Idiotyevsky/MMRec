@@ -2,11 +2,16 @@
 
 Guarantees enforced here (each has a regression test):
 * a sampled negative is never the positive target of that position;
-* a sampled negative is never any known interaction of that user
-  (train, validation or test), so negatives cannot silently become positives;
+* a sampled negative is never a *training* interaction of that user, so it
+  cannot silently be a positive the model is asked to rank down;
 * PAD (item 0) is never sampled;
 * duplicates inside one draw are tolerated but the *known-interaction* and
   *positive* exclusions are re-drawn until satisfied.
+
+The exclusion set is built from the **train prefix only** (see
+``build_training_interaction_keys``).  Validation/test targets are not special
+at training time: they are ordinary items the model has never seen, so they stay
+reachable as negatives.  Excluding them would leak the label.
 """
 
 from __future__ import annotations
@@ -23,8 +28,9 @@ class NegativeSampler:
     ----------
     num_items : size of the catalogue (internal ids are ``1..num_items``).
     train_freq : int array of length ``num_items + 1``; index 0 is ignored.
-    all_interactions : int64 array of ``user * num_items + item`` keys for every
-        interaction of every user.  Sorted.  Used for O(log n) membership tests.
+    all_interactions : int64 array of ``user * num_items + item`` keys.  Sorted;
+        used for O(log n) membership tests.  For training this must come from
+        ``build_training_interaction_keys`` (train prefix only).
     mode : ``uniform`` or ``popularity`` (sampling probability ∝ freq^power).
     """
 
@@ -114,9 +120,41 @@ class NegativeSampler:
     def build_interaction_keys(
         flat_items: np.ndarray, user_offsets: np.ndarray, num_items: int
     ) -> np.ndarray:
-        """Sorted ``user * num_items + item`` keys for every interaction."""
+        """Sorted ``user * num_items + item`` keys for every interaction.
+
+        Includes validation/test targets.  Do **not** use this to build a
+        *training* sampler: it would leak the future (see
+        ``build_training_interaction_keys``).
+        """
         flat = np.asarray(flat_items, dtype=np.int64)
         counts = np.diff(np.asarray(user_offsets, dtype=np.int64))
         user_of = np.repeat(np.arange(counts.shape[0], dtype=np.int64), counts)
         valid = flat > 0
         return user_of[valid] * num_items + flat[valid]
+
+
+def build_training_interaction_keys(
+    flat_items: np.ndarray,
+    user_offsets: np.ndarray,
+    train_len: np.ndarray,
+    num_items: int,
+) -> np.ndarray:
+    """Sorted ``user * num_items + item`` keys for **train-split items only**.
+
+    The training-time negative sampler may only know what the model has already
+    observed: the training prefix of each user.  Validation and test targets are
+    strictly in the future at training time, so excluding them would be an
+    information leak -- and it would also make the reported metric incomparable
+    to a method that does not leak.  Val/test items therefore stay legal
+    negatives during training.
+    """
+    flat = np.asarray(flat_items, dtype=np.int64)
+    offsets = np.asarray(user_offsets, dtype=np.int64)
+    counts = np.asarray(train_len, dtype=np.int64)
+    user_of = np.repeat(np.arange(counts.shape[0], dtype=np.int64), counts)
+    within = np.arange(int(counts.sum()), dtype=np.int64) - np.repeat(
+        np.cumsum(counts) - counts, counts
+    )
+    items = flat[offsets[:-1][user_of] + within]
+    valid = items > 0
+    return user_of[valid] * num_items + items[valid]
