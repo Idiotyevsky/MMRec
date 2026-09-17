@@ -36,12 +36,14 @@ def _git(*args: str) -> str | None:
     return out.stdout.strip()
 
 
-def _status_paths(paths: tuple[str, ...]) -> list[str]:
+def _status_paths(paths: tuple[str, ...]) -> list[str] | None:
     """Paths that differ from HEAD, using NUL-separated output.
 
     ``--porcelain -z`` is used because the human format starts with a status
     column whose leading space a plain ``.strip()`` would eat, shifting every
-    path by one character.
+    path by one character.  ``None`` means the question could not be answered
+    (git missing, timed out, nonzero exit) -- never "clean", which is why the
+    caller must not fold it into an empty list.
     """
     try:
         out = subprocess.run(
@@ -49,9 +51,9 @@ def _status_paths(paths: tuple[str, ...]) -> list[str]:
             cwd=ROOT, capture_output=True, timeout=10,
         )
     except Exception:
-        return []
+        return None
     if out.returncode != 0:
-        return []
+        return None
     entries = out.stdout.decode("utf-8", "replace").split("\0")
     return [e[3:] for e in entries if len(e) > 3]
 
@@ -61,7 +63,9 @@ def git_state() -> dict:
 
     ``git_dirty`` answers "could this number have been produced by code that is
     not in HEAD?" -- so it only looks at ``RESULT_DETERMINING_PATHS``, and
-    ``git_dirty_files`` lists what was modified.
+    ``git_dirty_files`` lists what was modified.  ``git_dirty`` is ``None``
+    (unknown) whenever the status call could not run; a run must not be
+    reported clean by default.
     """
     sha = _git("rev-parse", "HEAD")
     if sha is None:
@@ -69,8 +73,8 @@ def git_state() -> dict:
     dirty_files = _status_paths(RESULT_DETERMINING_PATHS)
     return {
         "git_sha": sha,
-        "git_dirty": bool(dirty_files),
-        "git_dirty_files": dirty_files[:20],
+        "git_dirty": None if dirty_files is None else bool(dirty_files),
+        "git_dirty_files": (dirty_files or [])[:20],
         "git_branch": _git("rev-parse", "--abbrev-ref", "HEAD"),
         "git_available": True,
     }
@@ -111,7 +115,14 @@ def build_manifest(
     best_metric: float | None = None,
     train_time_s: float | None = None,
     metrics: dict | None = None,
+    git: dict | None = None,
 ) -> dict:
+    """Build the manifest.
+
+    ``git`` must be the ``git_state()`` sampled when the run *started*: sampled
+    at the end, a source edit made while the run was in flight would retroactively
+    mark a run dirty although its code came from a clean tree.
+    """
     cfg_dict = cfg.to_dict() if hasattr(cfg, "to_dict") else dict(cfg)
     model_cfg = cfg_dict.get("model", {}) or {}
     manifest = {
@@ -131,7 +142,7 @@ def build_manifest(
         "best_metric": best_metric,
         "train_time_s": train_time_s,
     }
-    manifest.update(git_state())
+    manifest.update(git if git is not None else git_state())
     if metrics:
         manifest["test"] = metrics.get("test")
         manifest["val"] = metrics.get("val")

@@ -24,7 +24,10 @@ while IFS='|' read -r tag config extra; do
 
   # Guard against orchestrating the same experiment twice: a tag that already
   # has a finished run, or that is currently training, is skipped.
-  if compgen -G "results/runs/${tag}_*/metrics.json" >/dev/null 2>&1; then
+  # The glob must match a run id (`<tag>_<date>-<time>_<hash>`), not just the
+  # prefix: `${tag}_*` let tag `sasrec` match `sasrec_itemdrop_*` and silently
+  # skipped a job whose run did not exist.
+  if compgen -G "results/runs/${tag}_[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]-*/metrics.json" >/dev/null 2>&1; then
     echo "[$(date '+%F %T')] SKIP $tag (already has metrics.json)"
     continue
   fi

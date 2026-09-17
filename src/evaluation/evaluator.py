@@ -7,8 +7,11 @@ mask every item the user has already interacted with in the history that was fed
 to the model, and compute the exact rank of the ground-truth target.
 
 * The ground truth is never masked -- ``_mask_seen`` asserts this.
-* Scoring is chunked over items so that ``batch_size x num_items`` never has to
-  be materialised in one shot.
+* Candidate dot-products are computed in item chunks (``item_chunk_size``,
+  default 4096): the ``(batch, chunk)`` product is the largest temporary, while
+  the batch-level ``(batch, num_items)`` score matrix is retained and filled
+  chunk by chunk.  Ranking is therefore over the complete catalogue and exact --
+  no candidate pre-filtering, no approximate top-k.
 * Per-user ranks are returned, so cold-start / long-tail / per-bucket reports are
   slices of a single ranking pass and are guaranteed to come from the same
   scores.

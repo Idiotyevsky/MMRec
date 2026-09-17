@@ -64,6 +64,39 @@ class _Model:
         return 1234
 
 
+def test_a_failed_status_call_is_unknown_not_clean(monkeypatch):
+    """TIMEOUTS must not be laundered into "clean" -- ``None`` is not ``False``."""
+    import subprocess
+
+    class _Out:
+        returncode = 0
+        stdout = "abc123\n"
+
+    def fake_run(cmd, **kwargs):
+        if len(cmd) > 1 and cmd[1] == "status":
+            raise subprocess.TimeoutExpired(cmd="git status", timeout=10)
+        return _Out()
+
+    monkeypatch.setattr(provenance.subprocess, "run", fake_run)
+    state = provenance.git_state()
+    assert state["git_sha"] == "abc123"
+    assert state["git_dirty"] is None
+    assert state["git_dirty_files"] == []
+
+
+def test_manifest_uses_the_git_state_sampled_at_run_start(synthetic_data):
+    """A run must record where it started, not what the tree looked like when it finished."""
+    pinned = {"git_sha": "0" * 40, "git_dirty": False, "git_dirty_files": [],
+              "git_branch": "main", "git_available": True}
+    manifest = provenance.build_manifest(
+        cfg={"model": {"name": "sasrec"}, "training": {"seed": 42}},
+        data=synthetic_data, model=_Model(), seed=42,
+        run_id="sasrec_20260101-000000_aaaaaa", git=pinned,
+    )
+    assert manifest["git_sha"] == "0" * 40
+    assert manifest["git_dirty"] is False
+
+
 def test_manifest_carries_the_required_provenance(synthetic_data):
     cfg = {"model": {"name": "sasrec", "modalities": {"id": True}},
            "data": {"processed_dir": "data/processed/base"},

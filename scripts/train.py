@@ -26,7 +26,7 @@ from src.utils.config import load_config, save_config  # noqa: E402
 from src.utils.device import env_fingerprint, get_device  # noqa: E402
 from src.utils.io import ensure_dir, run_id, save_json  # noqa: E402
 from src.utils.logging import get_logger  # noqa: E402
-from src.utils.provenance import build_manifest, save_manifest  # noqa: E402
+from src.utils.provenance import build_manifest, git_state, save_manifest  # noqa: E402
 from src.utils.seed import set_seed  # noqa: E402
 
 
@@ -70,6 +70,10 @@ def main() -> None:
 
     save_config(cfg, run_dir / "config.yaml")
     save_json(env_fingerprint(), run_dir / "environment.txt")
+    # sampled now, not at the end: an edit made while this run trains must not
+    # retroactively mark it dirty
+    git_info = git_state()
+    logger.info(f"git {str(git_info.get('git_sha'))[:10]} dirty={git_info.get('git_dirty')}")
 
     model = build_model(cfg, data, device=device)
     trainer = Trainer(model, cfg, data, run_dir, device, logger=logger)
@@ -167,6 +171,7 @@ def main() -> None:
         best_metric=summary.get("best_metric"),
         train_time_s=summary.get("train_time_s"),
         metrics=results,
+        git=git_info,
     )
     save_manifest(manifest, run_dir, Path("results") / "manifests")
     logger.info(
