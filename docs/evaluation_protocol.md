@@ -225,3 +225,56 @@ Code identity is decided in three steps, most specific first:
 `tests/test_aggregation_guard.py` pins each step against the real repository,
 including that a class's commits differ from its reference in no file the class
 does not declare.
+
+
+## 9. Two-stage serving evaluation
+
+`scripts/evaluate_recall.py` and `scripts/evaluate_pipeline.py` measure the
+**serving** path, which is a different question from the full-catalogue protocol
+above.
+
+### Recall evaluation
+
+For each test user, run each recall channel with the user's history excluded and
+check whether the ground-truth target appears in the channel's top-K:
+
+```
+Recall@100 / Recall@200 / Recall@500 / Recall@1000   per channel and for the merged pool
+```
+
+This is *candidate generation* quality. It is the ceiling the ranker can reach:
+if the target is not in the pool, no ranker can retrieve it.
+
+### Pipeline evaluation
+
+For a range of candidate budgets, measure
+
+```
+candidate recall   →  is the target in the pool?
+final Recall@20    →  does the ranker put it in the top 20?
+final NDCG@20
+latency (mean, p95)
+```
+
+Recall is run **once per user** at the largest per-channel budget and every
+candidate size is evaluated by truncating the same merged pool, so the sizes are
+directly comparable and the comparison is not confounded by different recalls.
+
+The ranker scores only the pool, so latency grows with the budget — that is the
+trade-off being measured.
+
+### Why these numbers must not be mixed with the main table
+
+The full-catalogue protocol ranks all 19 738 items and therefore reports a
+strict upper bound on what the model can do. The pipeline protocol ranks a few
+hundred recalled items and reports what the *system* does. A pipeline number can
+legitimately be lower than the full-catalogue number for the same model, and
+neither is wrong. They live in different tables (`overall.csv` vs
+`pipeline_tradeoff.csv`) and are never presented as one comparison.
+
+### Recall source attribution
+
+`recall_source_contribution.csv` records, for the final top-20 hits, which
+channel(s) recalled each item. `multiple` means more than one channel found it.
+This is the evidence for whether semantic recall finds items the collaborative
+channels miss, split by popularity bucket.

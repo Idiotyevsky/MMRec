@@ -455,12 +455,12 @@ def efficiency_table() -> str:
         ["runs behind these numbers", str(len(id_grp) + len(mm_grp))],
     ]
     if bench:
-        rows.append(["ANN index", str(bench.get("backend", TBD))])
-        rows.append(["ANN build / query latency",
+        rows.append(["vector index", f'{bench.get("backend", TBD)} (exact inner product)'])
+        rows.append(["index build / query latency",
                      f"{bench.get('index_build_time_s', TBD)} s / "
                      f"{bench.get('query_latency_ms_per_query', TBD)} ms per query"])
     else:
-        rows.append(["ANN index", f"{TBD} (run `scripts/build_faiss_index.py`)"])
+        rows.append(["vector index", f"{TBD} (run `scripts/build_faiss_index.py`)"])
     return md_table(["", "value"], rows)
 
 
@@ -686,6 +686,84 @@ def findings() -> str:
     return "\n".join(lines)
 
 
+def recall_table() -> str:
+    """Recall@K per channel, from results/tables/recall_eval.csv."""
+    rows = read("recall_eval.csv")
+    if not rows:
+        return f"_Recall evaluation has not been run yet — {TBD}._"
+    ks = sorted({int(k.split("@")[1]) for k in rows[0] if k.startswith("Recall@")})
+    body = [[r["channel"]] + [fmt(r.get(f"Recall@{k}")) for k in ks] for r in rows]
+    n = rows[0].get("num_users", TBD)
+    return md_table(["Channel"] + [f"Recall@{k}" for k in ks], body) + (
+        f"\n\n_Test target, user history masked, {n} users. Candidate-generation quality: "
+        "this is the ceiling the ranker can reach._"
+    )
+
+
+def pipeline_table() -> str:
+    """Candidate size vs accuracy vs latency.
+
+    Accuracy comes from ``pipeline_tradeoff.csv`` (many users, one timing each);
+    latency comes from ``latency_benchmark.csv`` (few users, many repetitions).
+    They are measured separately because on a shared machine a single timing per
+    user is dominated by contention, not by the candidate budget.
+    """
+    rows = read("pipeline_tradeoff.csv")
+    if not rows:
+        return f"_Two-stage pipeline evaluation has not been run yet — {TBD}._"
+    latency = {r["candidate_k"]: r for r in read("latency_benchmark.csv")}
+
+    body = []
+    for r in rows:
+        k = r["candidate_k"]
+        lat = latency.get(k, {})
+        body.append([
+            k, fmt(r.get("candidate_recall")), fmt(r.get("final_Recall@20")),
+            fmt(r.get("final_NDCG@20")),
+            fmt(lat.get("recall_ms_min"), 1) if lat else TBD,
+            fmt(lat.get("rank_ms_min"), 2) if lat else TBD,
+        ])
+    full = latency.get("19738")
+    n = rows[0].get("num_users", TBD)
+    out = md_table(
+        ["Candidate budget", "Candidate recall", "Final Recall@20", "Final NDCG@20",
+         "Recall latency (ms)", "Rank latency (ms)"], body
+    )
+    if full:
+        out += (f"\n\nFor reference, ranking the **entire** catalogue "
+                f"({full['candidate_k']} items) costs {float(full['rank_ms_min']):.2f} ms "
+                f"on the same machine — essentially the same as a 100-item pool, because "
+                f"the ranker's cost here is dominated by encoding the user sequence, not by "
+                f"scoring candidates.")
+    lat_rows = read("latency_benchmark.csv")
+    if lat_rows:
+        lu, lr = lat_rows[0].get("users", "?"), lat_rows[0].get("rank_repeats", "?")
+        lat_note = (f"latency from a separate benchmark ({lu} users × {lr} repetitions, "
+                    f"minimum reported)")
+    else:
+        lat_note = "latency benchmark not run"
+    return out + (f"\n\n_{n} users for accuracy; {lat_note}. Ranker "
+                  f"`{rows[0].get('ranker', '?')}`, CPU serving. Candidate recall is the "
+                  f"share of users whose next item is in the pool at all — the hard ceiling "
+                  f"of the pipeline._")
+
+
+def source_table() -> str:
+    """Which recall channel produced the final top-20 hits."""
+    rows = read("recall_source_contribution.csv")
+    if not rows:
+        return f"_Recall source analysis has not been run yet — {TBD}._"
+    budget = max(int(r["candidate_k"]) for r in rows)
+    body = [[
+        r["source"], r["top20_hits"], fmt(r.get("share_of_hits")),
+        r.get("head_hits", TBD), r.get("middle_hits", TBD), r.get("tail_hits", TBD),
+    ] for r in rows if int(r["candidate_k"]) == budget]
+    return md_table(
+        ["Source", "Top-20 hits", "Share", "Head hits", "Middle hits", "Tail hits"], body
+    ) + (f"\n\n_Candidate budget {budget}. `multiple` means the item was found by more "
+         "than one channel._")
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", default=None)
@@ -693,6 +771,9 @@ def main() -> None:
 
     sections = {
         "OVERALL": overall_table(),
+        "RECALL": recall_table(),
+        "PIPELINE": pipeline_table(),
+        "SOURCES": source_table(),
         "ABLATION": ablation_table(),
         "COLD": cold_table(),
         "LONGTAIL": long_tail_table(),

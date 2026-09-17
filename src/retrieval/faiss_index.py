@@ -1,6 +1,8 @@
-"""Offline ANN index over learned item embeddings.
+"""Offline vector index over learned item embeddings.
 
-Faiss is an **optional** dependency: if it is unavailable the module falls back
+The default backend is ``faiss.IndexFlatIP``, which is an **exact**
+inner-product index, not an approximate nearest-neighbour index.  Faiss is an
+**optional** dependency: if it is unavailable the module falls back
 to an exact ``torch.topk`` search so that the retrieval path never blocks the
 rest of the project.  The fallback is exact rather than approximate, so recall
 numbers are comparable; only latency differs.
@@ -103,14 +105,19 @@ class ItemIndex:
             raw_scores, raw_ids = self._index.search(np.ascontiguousarray(q), fetch)
             out_ids = np.zeros((raw_ids.shape[0], top_k), dtype=np.int64)
             out_scores = np.full((raw_ids.shape[0], top_k), -np.inf, dtype=np.float32)
+            n_items = self.embeddings.shape[0]
             for b in range(raw_ids.shape[0]):
-                banned = {PAD}
+                # vectorised masking: a Python set lookup over the ~4k over-fetched
+                # rows costs ~15 ms/query and dominated the recall layer
+                banned = np.zeros(n_items, dtype=bool)
+                banned[PAD] = True
                 if ex is not None and b < ex.shape[0]:
-                    banned |= set(ex[b].tolist())
-                keep = [i for i, it in enumerate(raw_ids[b]) if int(it) not in banned]
-                if len(keep) < top_k:  # over-fetch was not enough: fall back to exact
+                    valid = ex[b][(ex[b] >= 0) & (ex[b] < n_items)]
+                    banned[valid] = True
+                keep = np.flatnonzero(~banned[raw_ids[b]])
+                if keep.size < top_k:  # over-fetch was not enough: fall back to exact
                     return self._exact_search(q, top_k, ex)
-                keep = np.asarray(keep[:top_k], dtype=np.int64)
+                keep = keep[:top_k]
                 out_ids[b] = raw_ids[b][keep]
                 out_scores[b] = raw_scores[b][keep].astype(np.float32)
             return out_ids, out_scores

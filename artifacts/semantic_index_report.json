@@ -1,0 +1,17 @@
+{
+  "modalities": [
+    "text",
+    "image"
+  ],
+  "num_items": 19738,
+  "dim": 1152,
+  "backend": "faiss.IndexFlatIP",
+  "retrieval_type": "exact inner-product (NOT approximate nearest neighbour)",
+  "normalised": true,
+  "build_time_s": 0.8,
+  "index_time_s": 1.04,
+  "query_latency_ms": 1.635,
+  "embeddings": "artifacts/content_embeddings.npy",
+  "index": "artifacts/content.index",
+  "note": "text and image blocks are L2-normalised before concatenation"
+}

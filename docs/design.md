@@ -155,5 +155,55 @@ frequency + cold mask + offsets) and refuse to load into a different dataset.
 | `src/evaluation/evaluator.py` | full-ranking evaluator |
 | `src/evaluation/slicing.py` | cold / popularity slices of one ranking pass |
 | `src/training/trainer.py` | training loop, AMP, checkpointing, early stopping |
-| `src/retrieval/faiss_index.py` | ANN index with exact fallback |
-| `src/serving/recommender.py` | history → user vector → ANN → top-K |
+| `src/recall/*` | candidate generation channels + merge |
+| `src/rerank/simple.py` | seen filter, dedup, cold exploration quota |
+| `src/pipeline/*` | ranker registry + two-stage recommender |
+| `src/data/metadata.py` | training-derived cold / bucket metadata for serving |
+| `src/retrieval/faiss_index.py` | exact inner-product index (Faiss, with numpy fallback) |
+| `src/serving/*` | service, schemas, FastAPI app |
+
+
+## 11. Two-stage serving architecture
+
+The offline experiments answer "how good is the model?" with a full-catalogue
+ranking.  The serving path answers a different question: "how would a real
+system answer this request?"  Those are separate code paths with separate
+metrics, and they are reported separately.
+
+```
+multi-channel recall  →  merge / dedup  →  ranker  →  rerank  →  top-K
+```
+
+**Why two stages at all.** Scoring 19 738 items per request is affordable at this
+catalogue size but does not generalise: real feeds score tens of millions. The
+two-stage split is the standard answer, and the interesting engineering question
+is where the recall/ranking boundary should sit — which is exactly what
+`scripts/evaluate_pipeline.py` measures.
+
+**Recall channels** (`src/recall/`). All three implement `RecallStrategy.recall`
+and share one contract: PAD is never returned, the user's history is always
+excluded, results are ordered and carry a 1-based rank. The base class provides
+the filtering so a new channel cannot accidentally violate it.
+
+**Merge** (`src/recall/pipeline.py`). Channel scores are not comparable
+(popularity counts vs similarity sums vs cosine), so the merge ranks by
+reciprocal rank fusion and keeps every contributing channel on the candidate.
+Deduplication merges rather than drops, because the Inspector needs to show
+*which* channel found each item.
+
+**Ranking** (`src/pipeline/rankers.py`). The registry wraps the existing model
+factory and checkpoints; it does not reimplement scoring. Item embeddings are
+cached once at load, so a request scores only the candidate pool.
+
+**Rerank** (`src/rerank/simple.py`). Deliberately three policies only. The cold
+exploration quota is an exposure decision, not a ranking improvement, and is off
+for every offline metric.
+
+**Id spaces.** The model, recall channels and indices all work in internal ids
+(`1..num_items`). `src/serving/service.py` is the only place that converts to and
+from raw MicroLens ids. Mixing the two is the single easiest way to serve a user
+the wrong history, so it is confined to one module.
+
+**Correctness guards.** `TwoStageRecommender.history` documents and enforces the
+1-based serving id → 0-based `ProcessedData` index conversion;
+`tests/test_pipeline.py::test_history_and_target_belong_to_the_same_user` pins it.

@@ -1,0 +1,85 @@
+{
+  "ranker": "mm_concat",
+  "device": "cpu",
+  "channels": [
+    "popular",
+    "itemcf",
+    "semantic"
+  ],
+  "recall_k_per_channel": 500,
+  "note": "minimum is the least-contended run and the closest estimate of true cost; median and p95 are reported so machine noise is visible",
+  "rows": [
+    {
+      "ranker": "mm_concat",
+      "candidate_k": 100,
+      "users": 150,
+      "rank_repeats": 20,
+      "recall_ms_min": 16.94614440202713,
+      "recall_ms_median": 23.20428704842925,
+      "rank_ms_min": 5.869656801223755,
+      "rank_ms_median": 7.9194121062755585,
+      "rank_ms_p95": 8.629341144114733,
+      "end_to_end_ms_min": 22.815801203250885
+    },
+    {
+      "ranker": "mm_concat",
+      "candidate_k": 200,
+      "users": 150,
+      "rank_repeats": 20,
+      "recall_ms_min": 16.96099527180195,
+      "recall_ms_median": 23.210689425468445,
+      "rank_ms_min": 6.050520576536655,
+      "rank_ms_median": 7.973857223987579,
+      "rank_ms_p95": 8.587062312290072,
+      "end_to_end_ms_min": 23.011515848338604
+    },
+    {
+      "ranker": "mm_concat",
+      "candidate_k": 500,
+      "users": 150,
+      "rank_repeats": 20,
+      "recall_ms_min": 18.969780765473843,
+      "recall_ms_median": 23.07000383734703,
+      "rank_ms_min": 6.179322488605976,
+      "rank_ms_median": 8.216069545596838,
+      "rank_ms_p95": 8.890230348333716,
+      "end_to_end_ms_min": 25.14910325407982
+    },
+    {
+      "ranker": "mm_concat",
+      "candidate_k": 1000,
+      "users": 150,
+      "rank_repeats": 20,
+      "recall_ms_min": 17.518043518066406,
+      "recall_ms_median": 23.390633519738913,
+      "rank_ms_min": 6.518226116895676,
+      "rank_ms_median": 8.587136399000883,
+      "rank_ms_p95": 9.297814127057789,
+      "end_to_end_ms_min": 24.036269634962082
+    },
+    {
+      "ranker": "mm_concat",
+      "candidate_k": 2000,
+      "users": 150,
+      "rank_repeats": 20,
+      "recall_ms_min": 18.120250664651394,
+      "recall_ms_median": 23.156183771789074,
+      "rank_ms_min": 6.482590921223164,
+      "rank_ms_median": 8.778232615441084,
+      "rank_ms_p95": 9.477527998387814,
+      "end_to_end_ms_min": 24.602841585874557
+    },
+    {
+      "ranker": "mm_concat",
+      "candidate_k": 19738,
+      "users": 150,
+      "rank_repeats": 20,
+      "recall_ms_min": 18.12213845551014,
+      "recall_ms_median": 23.503349162638187,
+      "rank_ms_min": 6.56866654753685,
+      "rank_ms_median": 8.884125389158726,
+      "rank_ms_p95": 9.56720570102334,
+      "end_to_end_ms_min": 24.69080500304699
+    }
+  ]
+}

@@ -1,0 +1,78 @@
+{
+  "processed_dir": "data/processed/base",
+  "num_users": 100000,
+  "ks": [
+    100,
+    200,
+    500,
+    1000
+  ],
+  "per_source_k": 1000,
+  "channels": [
+    {
+      "channel": "popular",
+      "num_users": 100000,
+      "Recall@100": 0.01697,
+      "Recall@200": 0.02994,
+      "Recall@500": 0.06252,
+      "Recall@1000": 0.10713
+    },
+    {
+      "channel": "itemcf",
+      "num_users": 100000,
+      "Recall@100": 0.14873,
+      "Recall@200": 0.18523,
+      "Recall@500": 0.23756,
+      "Recall@1000": 0.24788
+    },
+    {
+      "channel": "semantic",
+      "num_users": 100000,
+      "Recall@100": 0.07317,
+      "Recall@200": 0.10044,
+      "Recall@500": 0.15549,
+      "Recall@1000": 0.22245
+    },
+    {
+      "channel": "merged",
+      "num_users": 100000,
+      "Recall@100": 0.12688,
+      "Recall@200": 0.16519,
+      "Recall@500": 0.23273,
+      "Recall@1000": 0.30035
+    }
+  ],
+  "merged_by_bucket": [
+    {
+      "bucket": "head",
+      "num_users": 33521,
+      "Recall@100": 0.17096745323826854,
+      "Recall@200": 0.21753527639390233,
+      "Recall@500": 0.30234778198741086,
+      "Recall@1000": 0.39599057307359564
+    },
+    {
+      "bucket": "middle",
+      "num_users": 21904,
+      "Recall@100": 0.10322315558802045,
+      "Recall@200": 0.13554601899196494,
+      "Recall@500": 0.19238495252008767,
+      "Recall@1000": 0.2516435354273192
+    },
+    {
+      "bucket": "tail",
+      "num_users": 44575,
+      "Recall@100": 0.105350532809871,
+      "Recall@200": 0.14039259674705554,
+      "Recall@500": 0.2002019068984857,
+      "Recall@1000": 0.2523611890072911
+    }
+  ],
+  "pool_size": {
+    "mean": 2306.27349,
+    "min": 1844,
+    "max": 2915
+  },
+  "eval_time_s": 3818.7,
+  "note": "candidate generation quality; the user's own history is always excluded"
+}

@@ -1,4 +1,4 @@
-"""End-to-end recommender: user history -> user vector -> ANN -> top-K items.
+"""End-to-end recommender: user history -> user vector -> vector index -> top-K.
 
     rec = Recommender.from_run("results/runs/<run_id>")
     rec.recommend([12, 45, 91, 102], top_k=20)

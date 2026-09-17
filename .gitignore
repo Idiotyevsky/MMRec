@@ -10,6 +10,7 @@ data/processed/
 *.ckpt
 *.index
 artifacts/*.npy
+artifacts/*.npz
 
 # ---- per-run outputs (configs, logs, checkpoints, ranking dumps) ----
 results/runs/
@@ -29,6 +30,18 @@ results/legacy_pre_autoregressive_fix/*
 !artifacts/rqvae_sweep_*.json
 !artifacts/smoke_test_results.json
 !artifacts/raw_data_report.json
+!artifacts/itemcf_report.json
+!artifacts/semantic_index_report.json
+!artifacts/demo_manifest.json
+
+# ---- demo screenshots are small and referenced by the README ----
+!assets/*.png
+
+# ---- frontend ----
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+*.tsbuildinfo
 
 # ---- python ----
 __pycache__/
