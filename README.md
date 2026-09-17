@@ -283,12 +283,12 @@ _Mean over 6 documented run(s), from `results/tables/gate_by_bucket.csv`._
 
 | Model | Modality | Head | Middle | Tail |
 |---|---|---|---|---|
-| mm_sasrec | id | 0.964 | 0.965 | 0.954 |
-| mm_sasrec | image | 0.013 | 0.013 | 0.019 |
-| mm_sasrec | text | 0.024 | 0.022 | 0.027 |
-| mm_sasrec_iddrop | id | 0.967 | 0.961 | 0.939 |
-| mm_sasrec_iddrop | image | 0.016 | 0.019 | 0.029 |
-| mm_sasrec_iddrop | text | 0.017 | 0.020 | 0.033 |
+| mm_sasrec(id+text+image) | id | 0.964 | 0.965 | 0.954 |
+| mm_sasrec(id+text+image) | image | 0.013 | 0.013 | 0.019 |
+| mm_sasrec(id+text+image) | text | 0.024 | 0.022 | 0.027 |
+| mm_sasrec_iddrop(id+text+image) | id | 0.967 | 0.961 | 0.939 |
+| mm_sasrec_iddrop(id+text+image) | image | 0.016 | 0.019 | 0.029 |
+| mm_sasrec_iddrop(id+text+image) | text | 0.017 | 0.020 | 0.033 |
 <!-- /TABLE:GATES -->
 
 If the ID gate dominates everywhere, that is the mechanism behind the plain-gated

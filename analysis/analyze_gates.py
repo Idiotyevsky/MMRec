@@ -47,8 +47,17 @@ def _manifest(run_dir: Path) -> dict | None:
         return None
 
 
+MODALITY_ORDER = ("id", "text", "image", "video")
+
+
 def _variant(run_dir: Path) -> str:
-    """``mm_gated`` / ``mm_gated_iddrop`` -- read from the run's own config copy."""
+    """Grouping key for the gate table, read from the run's own config copy.
+
+    The modality set and the dataset are part of the name: an ablation run that
+    drops ``video``, or a cold-split run, gates different items through a
+    different model, and merging it into the default rows would average
+    incomparable numbers while the table claimed they came from one variant.
+    """
     try:
         cfg = yaml.safe_load((run_dir / "config.yaml").read_text(encoding="utf-8")) or {}
     except OSError:
@@ -57,8 +66,14 @@ def _variant(run_dir: Path) -> str:
     name = str(m.get("name", "?"))
     if name == "sasrec":
         return "sasrec" if float(m.get("id_dropout_prob") or m.get("item_dropout_prob") or 0) == 0 else "sasrec_reg"
-    drop = float(m.get("id_dropout_prob") or 0)
-    return f"{name}_iddrop" if drop > 0 else name
+    active = "+".join(k for k in MODALITY_ORDER if (m.get("modalities") or {}).get(k))
+    variant = f"{name}_iddrop" if float(m.get("id_dropout_prob") or 0) > 0 else name
+    if active:
+        variant += f"({active})"
+    dataset = Path(str((cfg.get("data") or {}).get("processed_dir", ""))).name
+    if dataset and dataset != "base":
+        variant += f"@{dataset}"
+    return variant
 
 
 def _gate_files() -> tuple[list[Path], list[str]]:
