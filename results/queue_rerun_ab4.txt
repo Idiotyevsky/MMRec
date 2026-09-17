@@ -1,0 +1,8 @@
+# The A-F matrix was specified at seeds 42/2026/3407.  Every cell now has three
+# seeds except the two ordering baselines: BPR-MF was trained once and Popular
+# (a frequency prior with no parameters) once, so "Popular < BPR-MF < SASRec"
+# currently rests on single runs.  These are the missing seeds.
+popular_s2026|configs/popular.yaml|--seed@2026
+popular_s3407|configs/popular.yaml|--seed@3407
+bpr_s2026|configs/bpr.yaml|--seed@2026
+bpr_s3407|configs/bpr.yaml|--seed@3407

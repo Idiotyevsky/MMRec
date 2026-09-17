@@ -1,16 +1,16 @@
 # Case study — ID-only SASRec vs multimodal MM-SASRec
 
-* ID-only run: `results/runs/sasrec_20260917-023725_63eba2`
-* Multimodal run: `results/runs/mm_gated_iddrop_20260917-023525_19c90f`
+* ID-only run: `results/runs/sasrec_20260917-060603_47936c`
+* Multimodal run: `results/runs/mm_gated_iddrop_20260917-053644_ec427f`
 * Test users: 100,000
-* Recall@20 — ID-only **0.0784**, multimodal **0.0860**
+* Recall@20 — ID-only **0.1253**, multimodal **0.1311**
 
 | category | users | share |
 |---|---|---|
-| both retrieve | 5,220 | 5.2% |
-| **rescued by multimodal** | 3,376 | 3.38% |
-| **broken by multimodal** | 2,615 | 2.61% |
-| both fail | 88,789 | 88.8% |
+| both retrieve | 8,962 | 9.0% |
+| **rescued by multimodal** | 4,152 | 4.15% |
+| **broken by multimodal** | 3,563 | 3.56% |
+| both fail | 83,323 | 83.3% |
 
 Item ids are the original MicroLens ids. The 100K subset has no titles, so
 `content nbrs` lists the target's nearest neighbours in the raw text+image
@@ -18,61 +18,97 @@ feature space — a semantic proxy for what the item is about.
 
 ## Rescued by multimodal
 
-### user 6
+### user 5
 
-* history (raw ids, oldest first): `[0, 593, 4334, 4946, 10760, 14643, 17547]`
-* ground truth: **17593** (popularity bucket `tail`, train freq 11, cold=False)
-* rank: ID-only `88` | multimodal `8`
-* ID-only top-5: `[11128, 8482, 3891, 10177, 7520]`
-* multimodal top-5: `[13184, 10177, 15167, 3121, 7889]`
-* content nbrs of target: `[11786, 13952, 12385, 4422, 18992]`
+* history (raw ids, oldest first): `[0, 6472, 6477, 11823, 14903, 14021, 16261, 15643, 16538, 18596]`
+* ground truth: **18036** (popularity bucket `head`, train freq 105, cold=False)
+* rank: ID-only `41` | multimodal `17`
+* ID-only top-5: `[18892, 18783, 19086, 19147, 18929]`
+* multimodal top-5: `[18134, 18929, 19086, 18892, 18452]`
+* content nbrs of target: `[9936, 14095, 9589, 16298, 14850]`
 
-### user 9
+### user 12
 
-* history (raw ids, oldest first): `[0, 10459, 11347, 11869]`
-* ground truth: **12558** (popularity bucket `head`, train freq 44, cold=False)
-* rank: ID-only `42` | multimodal `5`
-* ID-only top-5: `[12212, 8432, 7911, 9027, 13393]`
-* multimodal top-5: `[11544, 10527, 14982, 10662, 12558]`
-* content nbrs of target: `[19450, 10458, 15586, 19539, 10973]`
+* history (raw ids, oldest first): `[1, 2, 301, 406, 931, 939]`
+* ground truth: **1182** (popularity bucket `head`, train freq 59, cold=False)
+* rank: ID-only `206` | multimodal `19`
+* ID-only top-5: `[1226, 1005, 1026, 667, 1465]`
+* multimodal top-5: `[1026, 1384, 398, 1465, 1408]`
+* content nbrs of target: `[2678, 15497, 2998, 15411, 2471]`
+
+### user 26
+
+* history (raw ids, oldest first): `[1, 210, 2699, 3036, 3261, 7804]`
+* ground truth: **7875** (popularity bucket `head`, train freq 378, cold=False)
+* rank: ID-only `23` | multimodal `12`
+* ID-only top-5: `[10225, 8705, 8595, 8163, 7893]`
+* multimodal top-5: `[7893, 8163, 8239, 7807, 8587]`
+* content nbrs of target: `[4015, 19682, 4567, 12551, 6762]`
+
+### user 77
+
+* history (raw ids, oldest first): `[1, 2, 888, 1549, 1640, 2226]`
+* ground truth: **3417** (popularity bucket `head`, train freq 120, cold=False)
+* rank: ID-only `128` | multimodal `15`
+* ID-only top-5: `[2812, 2385, 2093, 3548, 4499]`
+* multimodal top-5: `[1408, 1600, 3548, 2462, 3255]`
+* content nbrs of target: `[9958, 3939, 122, 17950, 5020]`
+
+### user 81
+
+* history (raw ids, oldest first): `[1, 888, 272, 1889, 4435, 8160]`
+* ground truth: **8556** (popularity bucket `head`, train freq 61, cold=False)
+* rank: ID-only `93` | multimodal `17`
+* ID-only top-5: `[8595, 9868, 8589, 6554, 12186]`
+* multimodal top-5: `[8589, 7151, 8595, 8186, 8722]`
+* content nbrs of target: `[14095, 7587, 17904, 9341, 6701]`
+
+## Broken by multimodal (counter-examples)
 
 ### user 13
 
 * history (raw ids, oldest first): `[1, 2, 5, 1274, 1889, 3522, 4932, 4668]`
 * ground truth: **7804** (popularity bucket `head`, train freq 319, cold=False)
-* rank: ID-only `127` | multimodal `20`
-* ID-only top-5: `[4, 1065, 2437, 5375, 4311]`
-* multimodal top-5: `[4, 3598, 888, 1556, 3171]`
+* rank: ID-only `12` | multimodal `314`
+* ID-only top-5: `[8595, 6554, 6415, 5999, 9978]`
+* multimodal top-5: `[2978, 3548, 6554, 4389, 4986]`
 * content nbrs of target: `[9186, 4198, 8935, 3128, 16884]`
 
-## Broken by multimodal (counter-examples)
+### user 57
 
-### user 38
+* history (raw ids, oldest first): `[1, 2, 657, 1706, 3598, 7804, 8876, 11553, 13379, 19512]`
+* ground truth: **19529** (popularity bucket `tail`, train freq 4, cold=False)
+* rank: ID-only `6` | multimodal `29`
+* ID-only top-5: `[17906, 19104, 19015, 17896, 19254]`
+* multimodal top-5: `[19015, 18821, 19540, 19519, 19109]`
+* content nbrs of target: `[6249, 18070, 6389, 14369, 2347]`
 
-* history (raw ids, oldest first): `[1, 1540, 3417, 3598, 4118, 4211, 4201, 3521, 4311]`
-* ground truth: **5375** (popularity bucket `middle`, train freq 41, cold=False)
-* rank: ID-only `15` | multimodal `37`
-* ID-only top-5: `[9659, 4932, 2462, 12032, 2571]`
-* multimodal top-5: `[4932, 3890, 272, 3602, 3912]`
-* content nbrs of target: `[5768, 13737, 17856, 2381, 4151]`
+### user 121
 
-### user 110
+* history (raw ids, oldest first): `[4, 3748, 4601, 4569, 6047, 5999, 8199, 9853, 14956, 15127, 17142]`
+* ground truth: **19464** (popularity bucket `tail`, train freq 21, cold=False)
+* rank: ID-only `19` | multimodal `43`
+* ID-only top-5: `[17310, 17672, 18439, 17523, 17674]`
+* multimodal top-5: `[17674, 16089, 17310, 18311, 17672]`
+* content nbrs of target: `[8082, 5776, 7073, 13450, 6702]`
 
-* history (raw ids, oldest first): `[4, 1629, 2751, 477, 7118, 6975, 8611, 5399]`
-* ground truth: **14121** (popularity bucket `middle`, train freq 40, cold=False)
-* rank: ID-only `15` | multimodal `119`
-* ID-only top-5: `[7207, 2768, 8689, 8784, 1937]`
-* multimodal top-5: `[16261, 365, 2514, 2495, 84]`
-* content nbrs of target: `[19095, 16298, 1636, 18910, 15833]`
+### user 140
 
-### user 119
+* history (raw ids, oldest first): `[1, 3036, 4311, 4986]`
+* ground truth: **7213** (popularity bucket `middle`, train freq 39, cold=False)
+* rank: ID-only `15` | multimodal `72`
+* ID-only top-5: `[6554, 5999, 9868, 6415, 6318]`
+* multimodal top-5: `[6554, 5999, 7381, 4273, 3548]`
+* content nbrs of target: `[7922, 8749, 13745, 6522, 1275]`
 
-* history (raw ids, oldest first): `[4, 18, 135, 242, 267, 2522, 2652, 3171, 3912, 4201, 4713, 4785, 4903, 4968, 5029, 5216, 5388, 5554, 6323, 6415, 6324, 7148, 9597, 9659, 9966, 9990, 9792, 9973, 9269, 9088, 11186, 1006, 10199, 11004, 10830, 12024, 12186, 12447, 11193, 12604, 12821, 12805, 12878, 14374, 14472, 14525, 14723, 16236, 16865, 16880, 17239, 17585, 17776, 18301]`
-* ground truth: **18974** (popularity bucket `tail`, train freq 11, cold=False)
-* rank: ID-only `5` | multimodal `31`
-* ID-only top-5: `[15288, 16471, 19109, 8051, 18974]`
-* multimodal top-5: `[19121, 12982, 9802, 16169, 10019]`
-* content nbrs of target: `[15936, 8524, 13816, 9099, 1472]`
+### user 171
+
+* history (raw ids, oldest first): `[4, 2700, 5117, 2980, 11648, 17380]`
+* ground truth: **18036** (popularity bucket `head`, train freq 105, cold=False)
+* rank: ID-only `13` | multimodal `28`
+* ID-only top-5: `[18783, 18892, 18134, 18371, 18299]`
+* multimodal top-5: `[18929, 18134, 18587, 17921, 18596]`
+* content nbrs of target: `[9936, 14095, 9589, 16298, 14850]`
 
 ## Hard cases neither model solves
 
@@ -80,25 +116,43 @@ feature space — a semantic proxy for what the item is about.
 
 * history (raw ids, oldest first): `[0, 5412, 10209, 14805, 16123, 17741]`
 * ground truth: **13185** (popularity bucket `middle`, train freq 21, cold=False)
-* rank: ID-only `5315` | multimodal `3642`
-* ID-only top-5: `[18095, 17333, 17338, 15208, 9561]`
-* multimodal top-5: `[7388, 18095, 11684, 17333, 10726]`
+* rank: ID-only `2074` | multimodal `1425`
+* ID-only top-5: `[18620, 17193, 18418, 19468, 17333]`
+* multimodal top-5: `[18420, 18620, 10565, 18596, 17451]`
 * content nbrs of target: `[14003, 15755, 10375, 11391, 1800]`
 
 ### user 1
 
 * history (raw ids, oldest first): `[0, 1162, 6196, 2513]`
 * ground truth: **9535** (popularity bucket `tail`, train freq 3, cold=False)
-* rank: ID-only `10066` | multimodal `2428`
-* ID-only top-5: `[10162, 2930, 10358, 4106, 12151]`
-* multimodal top-5: `[2990, 11767, 6341, 6822, 5316]`
+* rank: ID-only `7068` | multimodal `12666`
+* ID-only top-5: `[12151, 10542, 8951, 10806, 11673]`
+* multimodal top-5: `[10624, 11673, 13009, 10466, 9596]`
 * content nbrs of target: `[7258, 9048, 10565, 6333, 14615]`
 
 ### user 2
 
 * history (raw ids, oldest first): `[0, 12827, 11904, 6905, 14037, 18346]`
 * ground truth: **19340** (popularity bucket `tail`, train freq 17, cold=False)
-* rank: ID-only `858` | multimodal `341`
-* ID-only top-5: `[12666, 12880, 15440, 17134, 18551]`
-* multimodal top-5: `[15952, 7582, 16362, 14003, 17104]`
+* rank: ID-only `30` | multimodal `175`
+* ID-only top-5: `[18991, 18700, 18048, 19563, 18600]`
+* multimodal top-5: `[18525, 18048, 18950, 18134, 18030]`
 * content nbrs of target: `[16053, 12534, 16638, 15834, 7227]`
+
+### user 3
+
+* history (raw ids, oldest first): `[0, 1516, 2521, 8732, 15698, 16062, 16676, 17855, 18701]`
+* ground truth: **19618** (popularity bucket `tail`, train freq 1, cold=False)
+* rank: ID-only `4317` | multimodal `1689`
+* ID-only top-5: `[18929, 19086, 18955, 18950, 18892]`
+* multimodal top-5: `[18929, 18134, 18596, 19565, 17921]`
+* content nbrs of target: `[8084, 15638, 12958, 15498, 9225]`
+
+### user 4
+
+* history (raw ids, oldest first): `[0, 592, 7090, 6341, 10109]`
+* ground truth: **16835** (popularity bucket `middle`, train freq 33, cold=False)
+* rank: ID-only `4484` | multimodal `1646`
+* ID-only top-5: `[12277, 11843, 12718, 14070, 4880]`
+* multimodal top-5: `[14991, 13215, 15558, 15487, 10239]`
+* content nbrs of target: `[5413, 19719, 9984, 4871, 15560]`

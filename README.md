@@ -171,8 +171,9 @@ regenerated from `results/tables/*.csv` by `python analysis/update_readme.py`.
 Every finished base-split configuration is listed: the ordering baseline
 (Popular → BPR → SASRec), the regularisation control, and the modality/fusion
 ablations. Rows without a ± are single-seed ablations — their seed spread has
-not been measured, so differences of the size of the multi-seed standard
-deviation (≈0.001–0.003 Recall@20) are **not** interpreted as real.
+not been measured, so where a difference is no larger than the multi-seed
+standard deviation shown on the rows that have one, it is **not** interpreted
+as real.
 
 ### Overall
 
@@ -271,14 +272,13 @@ below), not remembered here. What the comparison is designed to test is that
 content features can do something the collaborative signal structurally cannot.
 
 Two things sit outside the headline and are reported because they are awkward
-for the story: the ID-dropout variant — the base-split headline config — is the
-**weakest** of the three content-capable cold runs (restricted Recall@20 0.0789
-vs 0.0983 for the same modality set without ID-dropout), so on this evidence
-ID-dropout trades away content reliance rather than strengthening it; and in
-*full*-catalogue ranking every model finds a cold target about once per thousand
-users, which is the honest end-to-end number for a protocol where the target has
-to beat all ~20 000 items. Each cold row is one seed, so both are directions to
-confirm rather than settled effects.
+for the story. First, the ID-dropout variant — the base-split headline config —
+is the **weakest** of the three content-capable cold rows in the table below,
+i.e. on this evidence ID-dropout trades away content reliance rather than
+strengthening it. Second, the `Cold *` columns are tiny next to `ColdOnly *`:
+in full-catalogue ranking the target has to beat the whole catalogue, and the
+restricted columns are the ones that isolate content quality. Each cold row is
+one seed, so both are directions to confirm rather than settled effects.
 
 Ranks use the **tie-neutral midpoint policy** (`docs/evaluation_protocol.md`):
 with an optimistic policy every cold item tied at score 0 would be reported as a

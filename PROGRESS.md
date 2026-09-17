@@ -83,7 +83,7 @@ SASRec+item-dropout 0.2 `0.1283 ± 0.0009` < MM-SASRec gated+ID-dropout 0.2
   which made tag `sasrec` match `sasrec_itemdrop_*` and silently skipped a job
   whose run did not exist. It now matches a full run id
   (`<tag>_<8 digits>-<time>_<hash>/metrics.json`).
-- **Table-hygiene guards for the staged queues** — two ways the incoming
+- **Table-hygiene guards for the queued runs** — two ways the incoming
   ablation/cold runs could have silently corrupted the generated README were
   closed before they landed: the OVERALL/ABLATION tables now filter to
   `dataset == "base"` (a cold10 row would otherwise appear as a second,
@@ -124,11 +124,14 @@ SASRec+item-dropout 0.2 `0.1283 ± 0.0009` < MM-SASRec gated+ID-dropout 0.2
 - **Gate re-export for the new runs (Phase 11)** — `analyze_gates.py` now keys
   each row by `model(modalities)@dataset`, so ablation and cold exports can
   never be averaged into the base gated rows (13 documented runs).
-- **Result-determining-code equivalence across batches** — the 28 runs span six
-  commits, but `git diff --name-only <sha> 45901ec -- src scripts configs
-  pyproject.toml` is empty for every one of them, i.e. every run executed
-  byte-identical training/eval code; the aggregator confirms this by pooling all
-  28 with no run dropped.
+- **Result-determining-code equivalence across batches** — the table entries
+  span nine commits (`cc06c20` … `dd14e83`), so "one code version" was checked
+  hunk by hunk rather than asserted: `git diff cc06c20 <sha> -- src scripts` is
+  non-empty, but every hunk is one of (a) the `random` model branch in the
+  factory/trainer, (b) provenance and git-state recording, (c) an evaluator
+  docstring, (d) the queue runner's skip guard. None of them can change a
+  non-Random model's training or ranking, which is what the aggregator's
+  no-run-dropped pooling of the 28 runs also implies.
 - **Three table-integrity bugs found and fixed (all caught by the generated
   tables, all now pinned by tests)**
   - `group_seeds()` keyed on lowercase `fusion` while `ablation.csv` writes
@@ -172,9 +175,10 @@ SASRec+item-dropout 0.2 `0.1283 ± 0.0009` < MM-SASRec gated+ID-dropout 0.2
   `run_manifest.json` reproduce exactly from the run's own `config.yaml`.
 - All 14 main-matrix manifests carry `git_sha = cc06c20` with
   `git_dirty = False` — the batch ran on one committed code version.
-- All 28 manifests (main matrix + ablation + cold + the fusion follow-up) carry
-  `git_dirty = False`, and their SHAs' result-determining paths are identical to
-  `45901ec`, so no table pools code that differs while training.
+- All 30 run manifests carry `git_dirty = False`. The 28 runs behind the tables
+  span nine commits, and the `src`/`scripts` diff between them was read rather
+  than assumed empty (see above): the only changes are the Random baseline,
+  provenance recording and a docstring.
 - Gate analysis on all 6 MM runs (`gate_weights.npz` exported per run and read
   back from the checkpoint, never recomputed): the ID gate dominates
   (~0.96) and is lowest on tail items, while text/image weights rise toward the
@@ -209,6 +213,7 @@ SASRec+item-dropout 0.2 `0.1283 ± 0.0009` < MM-SASRec gated+ID-dropout 0.2
 | D: MM-SASRec gated + ID-dropout 0.2 (3 seeds) | 3 | **finished** |
 | modality / fusion ablation (base) | 9 | **finished** (`queue_rerun_ab1/2/3.txt`) |
 | cold split (Random, SASRec, content-only, gated, gated+ID-dropout) | 5 | **finished** (`queue_rerun_cold.txt`) |
+| Popular + BPR-MF at seeds 2026/3407 | 4 | **running** (`queue_rerun_ab4.txt`, GPU 0) |
 | Semantic-ID extension | — | paused until the discriminative results stabilise |
 
 Queues: `results/queue_main_{a,b,c,d}.txt` (GPU 1/2/3/5) — finished.
