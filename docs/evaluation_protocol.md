@@ -111,6 +111,21 @@ Cold results are reported two ways, both from real ranking passes:
 full-ranking number is the honest end-to-end one. They are never mixed in the
 same table without the candidate-set column being visible.
 
+### The uniform-random floor
+
+A uniform ranker over the cold catalogue is the null model for this protocol, and
+its expected score is known in closed form: with `N` cold candidates the
+expected restricted Recall@`k` is `k/N` and the mean rank is `(N+1)/2`.
+`RandomRecommender` (`src/models/random_model.py`) implements exactly that —
+frozen seeded item noise, zero parameters, PAD scored 0 — and it runs through
+the same `scripts/train.py`, evaluator and aggregation path as every other
+model (a parameter-free model skips the training loop and is evaluated once).
+With `N = 1974` the prediction is `20/1974 = 0.01013`; the measured cold-only
+Recall@20 is `0.00967` over 12 717 users (`se = 0.00089`), i.e. within one
+standard error. The cold evaluation path is therefore measuring the models, not
+an artefact of the candidate set. `tests/test_random_baseline.py` pins the
+closed form through the real evaluator on synthetic data.
+
 ### Current cold split (`data/processed/cold10`)
 
 ```
@@ -163,6 +178,7 @@ Reported per bucket: `Recall@20`, `NDCG@20`, and the gain
 | check | expectation |
 |---|---|
 | Popular vs random | Popular must beat a uniform-random scorer |
+| Random vs closed form | measured cold-only Recall@20 within sampling error of `k/N` |
 | BPR vs Popular | a trained MF must beat the popularity prior |
 | SASRec vs BPR | sequential modelling must beat static MF |
 | SASRec vs Popular | must beat the prior |
