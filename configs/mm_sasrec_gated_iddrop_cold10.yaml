@@ -1,0 +1,52 @@
+# Gated MM-SASRec trained on the simulated cold-item split (10% of items have
+# every training interaction removed).  Compare against sasrec_cold10.yaml.
+
+model:
+  name: mm_sasrec
+  hidden_size: 128
+  num_layers: 2
+  num_heads: 4
+  dropout: 0.2
+  max_seq_len: 50
+  fusion: gated
+  modalities:
+    id: true
+    text: true
+    image: true
+    video: false
+  id_dropout_prob: 0.2
+  modality_dropout_prob: 0.0
+  zero_cold_id: true
+
+data:
+  processed_dir: data/processed/cold10
+  feature_dir: data/raw
+  max_sequence_length: 50
+
+loss:
+  type: sampled_softmax
+  num_negatives: 128
+  temperature: 1.0
+
+negative_sampling:
+  mode: uniform
+  popularity_power: 0.75
+
+training:
+  batch_size: 512
+  learning_rate: 0.001
+  weight_decay: 0.0001
+  max_grad_norm: 5.0
+  amp: true
+  epochs: 200
+  early_stopping_patience: 20
+  scheduler: none
+  monitor: NDCG@10
+  monitor_mode: max
+  seed: 42
+  num_workers: 0
+
+evaluation:
+  full_ranking: true
+  item_chunk_size: 4096
+  ks: [5, 10, 20]

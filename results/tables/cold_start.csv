@@ -1,0 +1,3 @@
+tag,model,dataset,fusion,modalities,id_dropout,seed,num_cold_items,num_users,Cold Recall@5,Cold Recall@10,Cold Recall@20,Cold NDCG@10,Cold NDCG@20,ColdOnly Recall@10,ColdOnly Recall@20,ColdOnly NDCG@20,run_id
+cold_mm_gated,mm_sasrec,cold10,gated,id+text+image,0.0,42,1974,12717,0.0,7.9e-05,0.000236,2.4e-05,6.2e-05,0.009122,0.016671,0.006336,cold_mm_gated_20260917-034229_b23c25
+cold_sasrec,sasrec,cold10,-,id,0.0,42,1974,12717,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,cold_sasrec_20260917-032915_8fb253

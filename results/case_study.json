@@ -1,0 +1,424 @@
+{
+  "summary": {
+    "num_users": 100000,
+    "both_ok": 5220,
+    "rescued_by_mm": 3376,
+    "broken_by_mm": 2615,
+    "both_fail": 88789,
+    "recall20_mm": 0.08596,
+    "recall20_id": 0.07835,
+    "mm_run": "results/runs/mm_gated_iddrop_20260917-023525_19c90f",
+    "id_run": "results/runs/sasrec_20260917-023725_63eba2"
+  },
+  "cases": {
+    "rescued": [
+      {
+        "user_id": 6,
+        "raw_history": [
+          0,
+          593,
+          4334,
+          4946,
+          10760,
+          14643,
+          17547
+        ],
+        "raw_target": 17593,
+        "target_internal": 17594,
+        "rank_mm": 8,
+        "rank_id": 88,
+        "topk_mm": [
+          13184,
+          10177,
+          15167,
+          3121,
+          7889
+        ],
+        "topk_id": [
+          11128,
+          8482,
+          3891,
+          10177,
+          7520
+        ],
+        "content_neighbours_of_target": [
+          11786,
+          13952,
+          12385,
+          4422,
+          18992
+        ],
+        "target_popularity_bucket": 0,
+        "target_train_freq": 11,
+        "target_is_cold": false
+      },
+      {
+        "user_id": 9,
+        "raw_history": [
+          0,
+          10459,
+          11347,
+          11869
+        ],
+        "raw_target": 12558,
+        "target_internal": 12559,
+        "rank_mm": 5,
+        "rank_id": 42,
+        "topk_mm": [
+          11544,
+          10527,
+          14982,
+          10662,
+          12558
+        ],
+        "topk_id": [
+          12212,
+          8432,
+          7911,
+          9027,
+          13393
+        ],
+        "content_neighbours_of_target": [
+          19450,
+          10458,
+          15586,
+          19539,
+          10973
+        ],
+        "target_popularity_bucket": 2,
+        "target_train_freq": 44,
+        "target_is_cold": false
+      },
+      {
+        "user_id": 13,
+        "raw_history": [
+          1,
+          2,
+          5,
+          1274,
+          1889,
+          3522,
+          4932,
+          4668
+        ],
+        "raw_target": 7804,
+        "target_internal": 7805,
+        "rank_mm": 20,
+        "rank_id": 127,
+        "topk_mm": [
+          4,
+          3598,
+          888,
+          1556,
+          3171
+        ],
+        "topk_id": [
+          4,
+          1065,
+          2437,
+          5375,
+          4311
+        ],
+        "content_neighbours_of_target": [
+          9186,
+          4198,
+          8935,
+          3128,
+          16884
+        ],
+        "target_popularity_bucket": 2,
+        "target_train_freq": 319,
+        "target_is_cold": false
+      }
+    ],
+    "broken": [
+      {
+        "user_id": 38,
+        "raw_history": [
+          1,
+          1540,
+          3417,
+          3598,
+          4118,
+          4211,
+          4201,
+          3521,
+          4311
+        ],
+        "raw_target": 5375,
+        "target_internal": 5376,
+        "rank_mm": 37,
+        "rank_id": 15,
+        "topk_mm": [
+          4932,
+          3890,
+          272,
+          3602,
+          3912
+        ],
+        "topk_id": [
+          9659,
+          4932,
+          2462,
+          12032,
+          2571
+        ],
+        "content_neighbours_of_target": [
+          5768,
+          13737,
+          17856,
+          2381,
+          4151
+        ],
+        "target_popularity_bucket": 1,
+        "target_train_freq": 41,
+        "target_is_cold": false
+      },
+      {
+        "user_id": 110,
+        "raw_history": [
+          4,
+          1629,
+          2751,
+          477,
+          7118,
+          6975,
+          8611,
+          5399
+        ],
+        "raw_target": 14121,
+        "target_internal": 14122,
+        "rank_mm": 119,
+        "rank_id": 15,
+        "topk_mm": [
+          16261,
+          365,
+          2514,
+          2495,
+          84
+        ],
+        "topk_id": [
+          7207,
+          2768,
+          8689,
+          8784,
+          1937
+        ],
+        "content_neighbours_of_target": [
+          19095,
+          16298,
+          1636,
+          18910,
+          15833
+        ],
+        "target_popularity_bucket": 1,
+        "target_train_freq": 40,
+        "target_is_cold": false
+      },
+      {
+        "user_id": 119,
+        "raw_history": [
+          4,
+          18,
+          135,
+          242,
+          267,
+          2522,
+          2652,
+          3171,
+          3912,
+          4201,
+          4713,
+          4785,
+          4903,
+          4968,
+          5029,
+          5216,
+          5388,
+          5554,
+          6323,
+          6415,
+          6324,
+          7148,
+          9597,
+          9659,
+          9966,
+          9990,
+          9792,
+          9973,
+          9269,
+          9088,
+          11186,
+          1006,
+          10199,
+          11004,
+          10830,
+          12024,
+          12186,
+          12447,
+          11193,
+          12604,
+          12821,
+          12805,
+          12878,
+          14374,
+          14472,
+          14525,
+          14723,
+          16236,
+          16865,
+          16880,
+          17239,
+          17585,
+          17776,
+          18301
+        ],
+        "raw_target": 18974,
+        "target_internal": 18975,
+        "rank_mm": 31,
+        "rank_id": 5,
+        "topk_mm": [
+          19121,
+          12982,
+          9802,
+          16169,
+          10019
+        ],
+        "topk_id": [
+          15288,
+          16471,
+          19109,
+          8051,
+          18974
+        ],
+        "content_neighbours_of_target": [
+          15936,
+          8524,
+          13816,
+          9099,
+          1472
+        ],
+        "target_popularity_bucket": 0,
+        "target_train_freq": 11,
+        "target_is_cold": false
+      }
+    ],
+    "both_fail": [
+      {
+        "user_id": 0,
+        "raw_history": [
+          0,
+          5412,
+          10209,
+          14805,
+          16123,
+          17741
+        ],
+        "raw_target": 13185,
+        "target_internal": 13186,
+        "rank_mm": 3642,
+        "rank_id": 5315,
+        "topk_mm": [
+          7388,
+          18095,
+          11684,
+          17333,
+          10726
+        ],
+        "topk_id": [
+          18095,
+          17333,
+          17338,
+          15208,
+          9561
+        ],
+        "content_neighbours_of_target": [
+          14003,
+          15755,
+          10375,
+          11391,
+          1800
+        ],
+        "target_popularity_bucket": 1,
+        "target_train_freq": 21,
+        "target_is_cold": false
+      },
+      {
+        "user_id": 1,
+        "raw_history": [
+          0,
+          1162,
+          6196,
+          2513
+        ],
+        "raw_target": 9535,
+        "target_internal": 9536,
+        "rank_mm": 2428,
+        "rank_id": 10066,
+        "topk_mm": [
+          2990,
+          11767,
+          6341,
+          6822,
+          5316
+        ],
+        "topk_id": [
+          10162,
+          2930,
+          10358,
+          4106,
+          12151
+        ],
+        "content_neighbours_of_target": [
+          7258,
+          9048,
+          10565,
+          6333,
+          14615
+        ],
+        "target_popularity_bucket": 0,
+        "target_train_freq": 3,
+        "target_is_cold": false
+      },
+      {
+        "user_id": 2,
+        "raw_history": [
+          0,
+          12827,
+          11904,
+          6905,
+          14037,
+          18346
+        ],
+        "raw_target": 19340,
+        "target_internal": 19341,
+        "rank_mm": 341,
+        "rank_id": 858,
+        "topk_mm": [
+          15952,
+          7582,
+          16362,
+          14003,
+          17104
+        ],
+        "topk_id": [
+          12666,
+          12880,
+          15440,
+          17134,
+          18551
+        ],
+        "content_neighbours_of_target": [
+          16053,
+          12534,
+          16638,
+          15834,
+          7227
+        ],
+        "target_popularity_bucket": 0,
+        "target_train_freq": 17,
+        "target_is_cold": false
+      }
+    ]
+  }
+}

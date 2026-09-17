@@ -1,0 +1,10 @@
+run,bucket,modality,mean_gate
+mm_gated_iddrop_20260917-023525_19c90f,head,id,0.974325
+mm_gated_iddrop_20260917-023525_19c90f,middle,id,0.966111
+mm_gated_iddrop_20260917-023525_19c90f,tail,id,0.946513
+mm_gated_iddrop_20260917-023525_19c90f,head,image,0.01091
+mm_gated_iddrop_20260917-023525_19c90f,middle,image,0.014623
+mm_gated_iddrop_20260917-023525_19c90f,tail,image,0.02322
+mm_gated_iddrop_20260917-023525_19c90f,head,text,0.014765
+mm_gated_iddrop_20260917-023525_19c90f,middle,text,0.019265
+mm_gated_iddrop_20260917-023525_19c90f,tail,text,0.030267

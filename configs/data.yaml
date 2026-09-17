@@ -1,0 +1,28 @@
+# Shared data configuration.  Every model config includes these values under
+# `data:` so that a single YAML file is enough to reproduce a run.
+
+data:
+  raw_inter: data/raw/microlens_100k.inter
+  raw_feature_dir: data/raw
+  processed_dir: data/processed/base
+  feature_dir: data/raw
+
+  # filtering (config-driven, see docs/data_schema.md for the rationale)
+  min_user_interactions: 5
+  min_item_interactions: 1        # deliberately low: long-tail items are the study
+  max_sequence_length: 50
+
+  # popularity bucketing (training-interaction counts only)
+  popularity_rule: frequency_quantile   # or: interaction_mass
+  head_frac: 0.2
+  tail_frac: 0.6
+
+  # simulated cold-item protocol (used only for the cold variant)
+  cold_ratio: 0.0
+  cold_seed: 42
+  cold_min_eval_occurrences: 1
+
+evaluation:
+  full_ranking: true
+  item_chunk_size: 4096
+  ks: [5, 10, 20]

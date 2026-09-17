@@ -1,0 +1,3 @@
+popular|configs/popular.yaml|
+bpr|configs/bpr.yaml|
+sasrec|configs/sasrec.yaml|

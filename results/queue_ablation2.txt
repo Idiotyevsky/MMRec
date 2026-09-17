@@ -1,0 +1,3 @@
+ab_id_text|configs/mm_sasrec_gated.yaml|model.modalities={"id":true,"text":true,"image":false,"video":false}
+ab_id_image|configs/mm_sasrec_gated.yaml|model.modalities={"id":true,"text":false,"image":true,"video":false}
+ab_text_image|configs/mm_sasrec_gated.yaml|model.modalities={"id":false,"text":true,"image":true,"video":false}

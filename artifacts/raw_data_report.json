@@ -1,0 +1,151 @@
+{
+  "data_dir": "data/raw",
+  "files": {
+    "image_feat.npy": {
+      "size_mb": 57.826
+    },
+    "microlens_100k.inter": {
+      "size_mb": 18.776
+    },
+    "text_feat.npy": {
+      "size_mb": 28.913
+    },
+    "video_feat.npy": {
+      "size_mb": 77.102
+    }
+  },
+  "interactions": {
+    "file": "microlens_100k.inter",
+    "n_rows": 719406,
+    "delimiter": "tab",
+    "n_cols": 4,
+    "columns": [
+      {
+        "col": 0,
+        "n": 719405,
+        "min": 0,
+        "max": 99999,
+        "n_unique": 100000,
+        "mean": 47204.994614994335
+      },
+      {
+        "col": 1,
+        "n": 719405,
+        "min": 0,
+        "max": 19737,
+        "n_unique": 19738,
+        "mean": 10491.444204585734
+      },
+      {
+        "col": 2,
+        "n": 719405,
+        "min": 1583378629552,
+        "max": 1662984152842,
+        "n_unique": 719352,
+        "mean": 1658677734058.223
+      },
+      {
+        "col": 3,
+        "n": 719405,
+        "min": 0,
+        "max": 2,
+        "n_unique": 3,
+        "mean": 0.4381676524349984
+      }
+    ],
+    "sample_rows": [
+      [
+        "userID",
+        "itemID",
+        "timestamp",
+        "x_label"
+      ],
+      [
+        "0",
+        "10209",
+        "1658197898237",
+        "0"
+      ],
+      [
+        "0",
+        "16123",
+        "1661660511750",
+        "0"
+      ],
+      [
+        "0",
+        "0",
+        "1583378629552",
+        "0"
+      ],
+      [
+        "0",
+        "13185",
+        "1662714477582",
+        "0"
+      ]
+    ]
+  },
+  "features": {
+    "text": {
+      "path": "data/raw/text_feat.npy",
+      "shape": [
+        19738,
+        384
+      ],
+      "dtype": "float32",
+      "size_mb": 28.91,
+      "sampled_rows": 19738,
+      "mean": 0.0001501918519728537,
+      "std": 0.05103081530429731,
+      "min": -0.25971904397010803,
+      "max": 0.2785930037498474,
+      "nan_count": 0,
+      "inf_count": 0,
+      "row_norm_mean": 1.0000000002970304,
+      "row_norm_std": 3.270221443719769e-08,
+      "zero_rows": 0,
+      "std_per_dim_mean": 0.04641953744934785
+    },
+    "image": {
+      "path": "data/raw/image_feat.npy",
+      "shape": [
+        19738,
+        768
+      ],
+      "dtype": "float32",
+      "size_mb": 57.83,
+      "sampled_rows": 19738,
+      "mean": -0.019185062992071716,
+      "std": 0.9326244716526971,
+      "min": -8.899578094482422,
+      "max": 8.946876525878906,
+      "nan_count": 0,
+      "inf_count": 0,
+      "row_norm_mean": 25.848184127841037,
+      "row_norm_std": 0.3892911643655174,
+      "zero_rows": 0,
+      "std_per_dim_mean": 0.8251659886322935
+    },
+    "video": {
+      "path": "data/raw/video_feat.npy",
+      "shape": [
+        19738,
+        1024
+      ],
+      "dtype": "float32",
+      "size_mb": 77.1,
+      "sampled_rows": 19738,
+      "mean": -0.00781066824911387,
+      "std": 0.923757305419758,
+      "min": -5.097299098968506,
+      "max": 5.245615482330322,
+      "nan_count": 0,
+      "inf_count": 0,
+      "row_norm_mean": 29.419285957485602,
+      "row_norm_std": 2.894046507414053,
+      "zero_rows": 0,
+      "std_per_dim_mean": 0.8370528515619255
+    }
+  }
+}

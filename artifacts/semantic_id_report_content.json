@@ -1,0 +1,26 @@
+{
+  "source": "text+image(L2-normalised per modality)",
+  "input_dim": 1152,
+  "latent_dim": 64,
+  "num_codebooks": 4,
+  "codebook_size": 256,
+  "params": 1471168,
+  "train_time_s": 142.6,
+  "epochs": 300,
+  "reconstruction_mse": 0.0009228212293237448,
+  "reconstruction_cosine": 0.6810905337333679,
+  "codebook_utilization": [
+    1.0,
+    1.0,
+    1.0,
+    1.0
+  ],
+  "mean_codebook_utilization": 1.0,
+  "num_items": 19738,
+  "num_levels": 4,
+  "unique_semantic_ids": 19692,
+  "collision_rate": 0.0023305299422433645,
+  "num_colliding_sids": 38,
+  "num_items_in_collisions": 84,
+  "max_items_per_sid": 5
+}

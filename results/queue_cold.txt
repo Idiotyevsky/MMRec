@@ -1,0 +1,3 @@
+cold_sasrec|configs/sasrec_cold10.yaml|
+cold_mm_gated|configs/mm_sasrec_gated_cold10.yaml|
+cold_mm_gated_iddrop|configs/mm_sasrec_gated_iddrop_cold10.yaml|

@@ -1,0 +1,4 @@
+mm_concat_s2026|configs/mm_sasrec_concat.yaml|training.seed=2026
+mm_concat_s3407|configs/mm_sasrec_concat.yaml|training.seed=3407
+mm_gated_iddrop_s2026|configs/mm_sasrec_gated_iddrop.yaml|training.seed=2026
+mm_gated_iddrop_s3407|configs/mm_sasrec_gated_iddrop.yaml|training.seed=3407

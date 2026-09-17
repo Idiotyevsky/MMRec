@@ -1,0 +1,1 @@
+{"dim": 128, "num_items": 19739, "normalize": true, "backend": "faiss.IndexFlatIP"}

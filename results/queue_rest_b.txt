@@ -1,0 +1,4 @@
+sasrec_s2026|configs/sasrec.yaml|training.seed=2026
+sasrec_s3407|configs/sasrec.yaml|training.seed=3407
+mm_gated_s2026|configs/mm_sasrec_gated.yaml|training.seed=2026
+mm_gated_s3407|configs/mm_sasrec_gated.yaml|training.seed=3407

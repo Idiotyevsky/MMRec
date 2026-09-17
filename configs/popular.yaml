@@ -1,0 +1,18 @@
+# Popularity baseline: score(item) = training interaction count.
+# Purely a sanity check -- any trained model must beat it.
+
+model:
+  name: popular
+
+data:
+  processed_dir: data/processed/base
+  feature_dir: data/raw
+  max_sequence_length: 50
+
+evaluation:
+  full_ranking: true
+  item_chunk_size: 4096
+  ks: [5, 10, 20]
+
+training:
+  seed: 42

@@ -1,0 +1,1 @@
+ab_text_image|configs/mm_sasrec_gated.yaml|model.modalities={"id":false,"text":true,"image":true,"video":false}

@@ -1,0 +1,5 @@
+ab_id_text_image_video|configs/mm_sasrec_gated.yaml|model.modalities={"id":true,"text":true,"image":true,"video":true}
+cold_sasrec|configs/sasrec_cold10.yaml|
+cold_mm_gated|configs/mm_sasrec_gated_cold10.yaml|
+cold_mm_gated_iddrop|configs/mm_sasrec_gated_iddrop_cold10.yaml|
+cold_mm_concat|configs/mm_sasrec_gated_cold10.yaml|model.fusion=concat

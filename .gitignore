@@ -1,0 +1,48 @@
+# ---- data (never commit raw or processed datasets) ----
+data/raw/
+data/processed/
+*.inter
+*_feat.npy
+
+# ---- trained weights / indices (regenerable, tens of MB) ----
+*.pt
+*.pth
+*.ckpt
+*.index
+artifacts/*.npy
+
+# ---- per-run outputs (configs, logs, checkpoints, ranking dumps) ----
+results/runs/
+results/logs/
+
+# ---- keep the small, human-readable evidence the README links to ----
+!results/figures/*.png
+!results/tables/*.csv
+!results/case_study.md
+!results/case_study.json
+!artifacts/semantic_ids_*.npz
+!artifacts/semantic_id_report_*.json
+!artifacts/rqvae_sweep_*.json
+!artifacts/smoke_test_results.json
+!artifacts/raw_data_report.json
+
+# ---- python ----
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.ipynb_checkpoints/
+
+# ---- editors / os ----
+.vscode/
+.idea/
+.DS_Store
+*.swp
+nohup.out

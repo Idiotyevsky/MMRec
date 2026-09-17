@@ -1,0 +1,135 @@
+[
+  {
+    "tag": "sweep_l64_k4_c256_b005",
+    "config": {
+      "latent_dim": 64,
+      "num_codebooks": 4,
+      "codebook_size": 256,
+      "commitment": 0.05,
+      "lr": 0.001
+    },
+    "source": "text+image(L2-normalised per modality)",
+    "input_dim": 1152,
+    "latent_dim": 64,
+    "num_codebooks": 4,
+    "codebook_size": 256,
+    "params": 1471168,
+    "train_time_s": 71.4,
+    "epochs": 150,
+    "reconstruction_mse": 0.0009667345439083874,
+    "reconstruction_cosine": 0.6619778275489807,
+    "codebook_utilization": [
+      1.0,
+      1.0,
+      0.99609375,
+      0.9921875
+    ],
+    "mean_codebook_utilization": 0.9970703125,
+    "num_items": 19738,
+    "num_levels": 4,
+    "unique_semantic_ids": 19692,
+    "collision_rate": 0.0023305299422433645,
+    "num_colliding_sids": 36,
+    "num_items_in_collisions": 82,
+    "max_items_per_sid": 7
+  },
+  {
+    "tag": "sweep_l32_k3_c256_b005",
+    "config": {
+      "latent_dim": 32,
+      "num_codebooks": 3,
+      "codebook_size": 256,
+      "commitment": 0.05,
+      "lr": 0.001
+    },
+    "source": "text+image(L2-normalised per modality)",
+    "input_dim": 1152,
+    "latent_dim": 32,
+    "num_codebooks": 3,
+    "codebook_size": 256,
+    "params": 1393248,
+    "train_time_s": 56.4,
+    "epochs": 150,
+    "reconstruction_mse": 0.0010305286850780249,
+    "reconstruction_cosine": 0.6330516338348389,
+    "codebook_utilization": [
+      1.0,
+      1.0,
+      0.99609375
+    ],
+    "mean_codebook_utilization": 0.9986979166666666,
+    "num_items": 19738,
+    "num_levels": 3,
+    "unique_semantic_ids": 19624,
+    "collision_rate": 0.005775661161211865,
+    "num_colliding_sids": 107,
+    "num_items_in_collisions": 221,
+    "max_items_per_sid": 4
+  },
+  {
+    "tag": "sweep_l64_k3_c256_b005",
+    "config": {
+      "latent_dim": 64,
+      "num_codebooks": 3,
+      "codebook_size": 256,
+      "commitment": 0.05,
+      "lr": 0.001
+    },
+    "source": "text+image(L2-normalised per modality)",
+    "input_dim": 1152,
+    "latent_dim": 64,
+    "num_codebooks": 3,
+    "codebook_size": 256,
+    "params": 1454784,
+    "train_time_s": 54.7,
+    "epochs": 150,
+    "reconstruction_mse": 0.001001077238470316,
+    "reconstruction_cosine": 0.6467186808586121,
+    "codebook_utilization": [
+      1.0,
+      1.0,
+      0.99609375
+    ],
+    "mean_codebook_utilization": 0.9986979166666666,
+    "num_items": 19738,
+    "num_levels": 3,
+    "unique_semantic_ids": 19523,
+    "collision_rate": 0.010892694295267957,
+    "num_colliding_sids": 201,
+    "num_items_in_collisions": 416,
+    "max_items_per_sid": 7
+  },
+  {
+    "tag": "sweep_l128_k3_c256_b005",
+    "config": {
+      "latent_dim": 128,
+      "num_codebooks": 3,
+      "codebook_size": 256,
+      "commitment": 0.05,
+      "lr": 0.001
+    },
+    "source": "text+image(L2-normalised per modality)",
+    "input_dim": 1152,
+    "latent_dim": 128,
+    "num_codebooks": 3,
+    "codebook_size": 256,
+    "params": 1577856,
+    "train_time_s": 58.0,
+    "epochs": 150,
+    "reconstruction_mse": 0.0009904479375109076,
+    "reconstruction_cosine": 0.6515494585037231,
+    "codebook_utilization": [
+      1.0,
+      1.0,
+      0.99609375
+    ],
+    "mean_codebook_utilization": 0.9986979166666666,
+    "num_items": 19738,
+    "num_levels": 3,
+    "unique_semantic_ids": 19327,
+    "collision_rate": 0.020822778397000752,
+    "num_colliding_sids": 362,
+    "num_items_in_collisions": 773,
+    "max_items_per_sid": 7
+  }
+]
