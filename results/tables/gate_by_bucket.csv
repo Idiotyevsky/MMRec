@@ -1,4 +1,10 @@
 model,run,bucket,modality,mean_gate
+mm_sasrec(id+text),ab_id_text_20260917-070902_10b539,head,id,0.977423
+mm_sasrec(id+text),ab_id_text_20260917-070902_10b539,middle,id,0.981016
+mm_sasrec(id+text),ab_id_text_20260917-070902_10b539,tail,id,0.97443
+mm_sasrec(id+text),ab_id_text_20260917-070902_10b539,head,text,0.022577
+mm_sasrec(id+text),ab_id_text_20260917-070902_10b539,middle,text,0.018984
+mm_sasrec(id+text),ab_id_text_20260917-070902_10b539,tail,text,0.02557
 mm_sasrec(id+text+image),mm_gated_20260917-053644_dfe900,head,id,0.962188
 mm_sasrec(id+text+image),mm_gated_20260917-053644_dfe900,middle,id,0.963614
 mm_sasrec(id+text+image),mm_gated_20260917-053644_dfe900,tail,id,0.954221
