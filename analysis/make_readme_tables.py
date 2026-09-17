@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import json
 import statistics
 from pathlib import Path
 
@@ -45,6 +46,8 @@ def label(row: dict) -> str:
         return "Popular (train-freq)" + suffix
     if model == "bpr":
         return "BPR-MF" + suffix
+    if model == "random":
+        return "Random (uniform)" + suffix
     if model == "sasrec":
         base = "SASRec (ID-only)"
     else:
@@ -60,25 +63,51 @@ def label(row: dict) -> str:
 
 DEFAULT_KEY = ("dataset", "model", "fusion", "modalities", "id_dropout", "item_dropout")
 
+# Bookkeeping columns that identify a run rather than measure it: averaged or
+# copied into "x ± y" they would be nonsense (a mean seed? a mean parameter
+# count?).  Everything else that parses as a float is averaged across seeds --
+# including bucket-prefixed metrics like ``tail_Recall@20``, which a hardcoded
+# metric list would silently leave at the first seed's value.
+IDENTITY_FIELDS = {
+    "tag", "run_id", "dataset", "model", "fusion", "modalities", "seed",
+    "id_dropout", "item_dropout", "modality_dropout", "params", "num_users",
+    "num_items", "num_cold_items", "bucket_rule", "best_epoch",
+    "head_users", "middle_users", "tail_users",
+    "ID", "Text", "Image", "Video",
+}
+
 
 def group_seeds(rows: list[dict], key_fields=DEFAULT_KEY) -> list[dict]:
-    """Collapse multi-seed runs into mean ± std strings."""
+    """Collapse multi-seed runs into mean ± std strings.
+
+    Any numeric column not named in ``IDENTITY_FIELDS`` is averaged, so a new
+    metric cannot silently fall back to a single seed's value.
+    """
     groups: dict[tuple, list[dict]] = {}
     for r in rows:
         groups.setdefault(tuple(r.get(k, "") for k in key_fields), []).append(r)
     out = []
     for key, rs in groups.items():
         merged = dict(rs[0])
-        for metric in ("Recall@5", "Recall@10", "Recall@20", "NDCG@5", "NDCG@10",
-                       "NDCG@20", "MRR@20", "Coverage@20", "Cold Recall@10",
-                       "Cold Recall@20", "Cold NDCG@10", "Cold NDCG@20",
-                       "ColdOnly Recall@10", "ColdOnly Recall@20", "ColdOnly NDCG@20"):
-            vals = [float(r[metric]) for r in rs if r.get(metric) not in (None, "", "None")]
-            if not vals:
-                continue
-            merged[metric] = (f"{statistics.mean(vals):.4f} ± {statistics.stdev(vals):.4f}"
-                              if len(vals) > 1 else f"{vals[0]:.4f}")
-            merged[metric + "__n"] = len(vals)
+        if len(rs) > 1:
+            for col in sorted({c for r in rs for c in r}):
+                if col in IDENTITY_FIELDS or col in key_fields or col == "n_seeds":
+                    continue
+                vals: list[float] = []
+                for r in rs:
+                    v = r.get(col)
+                    if v in (None, "", "None", TBD):
+                        continue
+                    try:
+                        vals.append(float(v))
+                    except (TypeError, ValueError):
+                        vals = []
+                        break
+                if not vals:
+                    continue
+                merged[col] = (f"{statistics.mean(vals):.4f} ± {statistics.stdev(vals):.4f}"
+                               if len(vals) > 1 else f"{vals[0]:.4f}")
+                merged[col + "__n"] = len(vals)
         merged["n_seeds"] = len(rs)
         out.append(merged)
     return out
@@ -157,10 +186,8 @@ def long_tail_table() -> str:
 
 
 def _val(row: dict, bucket: str, metric: str = "Recall@20") -> float | None:
-    try:
-        return float(row[f"{bucket}_{metric}"])
-    except (KeyError, TypeError, ValueError):
-        return None
+    """A bucket metric as a float; merged rows hold ``mean ± std`` strings."""
+    return _num(row, f"{bucket}_{metric}")
 
 
 def gain_table() -> str:
@@ -207,6 +234,346 @@ def gain_table() -> str:
     )
 
 
+def dataset_table() -> str:
+    """Descriptive dataset figures, read from ``results/dataset_stats/*.json``.
+
+    These are copies of the ``stats.json`` written by preprocessing, committed so
+    the numbers in the README have an artifact behind them without shipping the
+    data itself.
+    """
+    d = ROOT / "results" / "dataset_stats"
+    files = sorted(d.glob("*.json")) if d.is_dir() else []
+    if not files:
+        return f"_No dataset stats committed yet — {TBD}._"
+
+    rows = []
+    for f in files:
+        s = json.loads(f.read_text(encoding="utf-8"))
+        freq = s.get("item_freq_train", {})
+        cold = s.get("cold_split") or {}
+        rows.append([
+            f"`{f.stem}`",
+            str(s.get("num_users", TBD)),
+            str(s.get("num_items", TBD)),
+            str(s.get("num_interactions", TBD)),
+            f"{s.get('sparsity', float('nan')):.5f}",
+            f"{s.get('avg_sequence_length', float('nan')):.2f}",
+            str(s.get("num_train_interactions", TBD)),
+            str(freq.get("median", TBD)),
+            str(freq.get("num_zero_freq", TBD)),
+            str(cold.get("num_cold_items", 0)),
+        ])
+    return md_table(["split", "users", "items", "interactions", "sparsity",
+                     "mean seq len", "train interactions", "median train item freq",
+                     "items with 0 train freq", "cold items"], rows)
+
+
+def gates_table() -> str:
+    """Mean fusion gate weight per bucket, written by ``analysis/analyze_gates.py``.
+
+    Rows from manifest-less runs never reach ``gate_by_bucket.csv`` (the analysis
+    refuses them), and the plain-gated and ID-dropout variants are separate rows
+    because they answer different questions.
+    """
+    rows = read("gate_by_bucket.csv")
+    if not rows:
+        return f"_No gate export from a documented run yet — {TBD}._"
+    buckets = [b for b in ("head", "middle", "tail", "cold")
+               if any(r["bucket"] == b for r in rows)]
+    keys: list[tuple[str, str]] = []
+    for r in rows:
+        k = (r["model"], r["modality"])
+        if k not in keys:
+            keys.append(k)
+    keys.sort()
+    body = []
+    for model, modality in keys:
+        cells = []
+        for b in buckets:
+            vals = [float(r["mean_gate"]) for r in rows
+                    if r["model"] == model and r["modality"] == modality and r["bucket"] == b]
+            cells.append(f"{statistics.mean(vals):.3f}" if vals else TBD)
+        body.append([model, modality] + cells)
+    n_runs = len({r["run"] for r in rows})
+    return (f"_Mean over {n_runs} documented run(s), from "
+            "`results/tables/gate_by_bucket.csv`._\n\n"
+            + md_table(["Model", "Modality"] + [b.capitalize() for b in buckets], body))
+
+
+def efficiency_table() -> str:
+    """Parameter count and wall-clock cost, all from run artifacts."""
+    idx = read("runs_index.csv")
+    if not idx:
+        return f"_No finished runs yet — {TBD}._"
+
+    def pick(**want):
+        for r in idx:
+            if all(str(r.get(k, "")) == str(v) for k, v in want.items()):
+                return r
+        return None
+
+    id_run = pick(model="sasrec", item_dropout="0.0")
+    mm_run = pick(model="mm_sasrec", fusion="gated", id_dropout="0.2") or pick(
+        model="mm_sasrec", fusion="gated")
+
+    def _mean(runs, key) -> float | None:
+        vals = [float(r[key]) for r in runs if r.get(key) not in (None, "", "None")]
+        return statistics.mean(vals) if vals else None
+
+    def _params(model=None, **want) -> float | None:
+        rs = [r for r in idx if (model is None or r.get("model") == model)
+              and all(str(r.get(k, "")) == str(v) for k, v in want.items())]
+        return _mean(rs, "params")
+
+    p_id = _params(model="sasrec", item_dropout="0.0")
+    p_mm = _params(model="mm_sasrec", fusion="gated", id_dropout="0.2") or _params(
+        model="mm_sasrec", fusion="gated")
+
+    def s(v, digits=0):
+        return TBD if v is None else (f"{v:,.{digits}f}".replace(",", " ") if digits == 0
+                                      else f"{v:,.{digits}f}")
+
+    def per_epoch(r):
+        if not r:
+            return None
+        t, e = _num(r, "train_time_s"), _num(r, "epochs")
+        return t / e if t and e else None
+
+    id_grp = [r for r in idx if r.get("model") == "sasrec" and str(r.get("item_dropout")) == "0.0"]
+    mm_grp = [r for r in idx if r.get("model") == "mm_sasrec" and r.get("fusion") == "gated"
+              and str(r.get("id_dropout")) == "0.2"] or [
+        r for r in idx if r.get("model") == "mm_sasrec" and r.get("fusion") == "gated"]
+
+    delta = "—"
+    if p_id and p_mm:
+        delta = f"+{100.0 * (p_mm - p_id) / p_id:.1f} %"
+
+    # committed copies, so CI (no results/runs/) regenerates the same table
+    bench = None
+    bench_dir = ROOT / "results" / "retrieval_benchmarks"
+    if bench_dir.is_dir():
+        preferred = [p for p in sorted(bench_dir.glob("*.json"))
+                     if mm_run and str(mm_run["run_id"]) in p.name]
+        files = preferred or sorted(bench_dir.glob("*.json"))
+        if files:
+            bench = json.loads(files[0].read_text(encoding="utf-8"))
+
+    overall = read("overall.csv")
+    n_users = _spaced(_num(overall[0], "num_users") if overall else None)
+    # committed dataset stats, not a run directory: this file is regenerated in
+    # CI, where results/runs/ (gitignored) does not exist
+    n_items = TBD
+    stats = ROOT / "results" / "dataset_stats" / "base.json"
+    if stats.exists():
+        n_items = _spaced(_num(json.loads(stats.read_text(encoding="utf-8")), "num_items"))
+    eval_txt = f"full ranking, {n_users} users x {n_items} items"
+
+    def both(id_v, mm_v, unit=""):
+        return f"{id_v} / {mm_v}{unit}"
+
+    rows = [
+        ["SASRec (ID-only) parameters", s(p_id)],
+        ["MM-SASRec (gated) parameters", f"{s(p_mm)} ({delta})" if p_mm else TBD],
+        ["epochs trained (SASRec / MM)", both(s(_mean(id_grp, "epochs")),
+                                              s(_mean(mm_grp, "epochs")))],
+        ["wall time per epoch (SASRec / MM)", both(s(per_epoch(id_run), 1),
+                                                   s(per_epoch(mm_run), 1), " s")],
+        ["total training time (SASRec / MM)", both(s(_mean(id_grp, 'train_time_s'), 0),
+                                                   s(_mean(mm_grp, 'train_time_s'), 0), " s")],
+        ["evaluation", eval_txt],
+        ["runs behind these numbers", str(len(id_grp) + len(mm_grp))],
+    ]
+    if bench:
+        rows.append(["ANN index", str(bench.get("backend", TBD))])
+        rows.append(["ANN build / query latency",
+                     f"{bench.get('index_build_time_s', TBD)} s / "
+                     f"{bench.get('query_latency_ms_per_query', TBD)} ms per query"])
+    else:
+        rows.append(["ANN index", f"{TBD} (run `scripts/build_faiss_index.py`)"])
+    return md_table(["", "value"], rows)
+
+
+def _num(row: dict | None, key: str) -> float | None:
+    """A cell as a float, whether it holds a raw value or 'mean ± std'."""
+    if not row:
+        return None
+    v = row.get(key)
+    if v in (None, "", "None", TBD):
+        return None
+    if isinstance(v, str) and "±" in v:
+        v = v.split("±")[0]
+    try:
+        return float(v)
+    except (TypeError, ValueError):
+        return None
+
+
+def _pick(rows: list[dict], **want) -> dict | None:
+    """First row whose fields match; numeric strings compare numerically."""
+    for r in rows:
+        ok = True
+        for k, v in want.items():
+            got = r.get(k, "")
+            if isinstance(v, float):
+                try:
+                    ok &= abs(float(got or 0) - v) < 1e-9
+                except (TypeError, ValueError):
+                    ok = False
+            else:
+                ok &= str(got) == str(v)
+        if ok:
+            return r
+    return None
+
+
+def _gain(new: float | None, ref: float | None) -> str:
+    if new is None or ref is None:
+        return TBD
+    return f"{new - ref:+.4f}"
+
+
+def _spaced(n: float | None) -> str:
+    return TBD if n is None else f"{int(n):,}".replace(",", " ")
+
+
+def _seeds(row: dict | None) -> str:
+    """How many runs of this experiment went into the value, as ``3 runs``."""
+    if not row:
+        return TBD
+    n = row.get("n_seeds", "?")
+    try:
+        n = int(n)
+    except (TypeError, ValueError):
+        return str(n)
+    return f"{n} run" + ("" if n == 1 else "s")
+
+
+def findings() -> str:
+    """Key findings, computed from the same CSVs as the tables above.
+
+    Nothing here is written by hand: every value is a difference of two cells,
+    each claim names its denominator, and a missing run renders as ``TBD``
+    instead of a remembered number.
+    """
+    overall = group_seeds(read("overall.csv"))
+    long_tail = group_seeds(read("long_tail.csv"))
+    cold = group_seeds(read("cold_start.csv"))
+    if not overall:
+        return f"_No finished runs yet — {TBD}._"
+
+    base = [r for r in overall if r.get("dataset", "base") == "base"]
+    pop = _pick(base, model="popular")
+    bpr = _pick(base, model="bpr")
+    mm = _pick(base, model="mm_sasrec", fusion="gated", id_dropout=0.2)
+    mm_plain = _pick(base, model="mm_sasrec", fusion="gated", id_dropout=0.0)
+    mm_concat = _pick(base, model="mm_sasrec", fusion="concat", id_dropout=0.0)
+    reg = _pick(base, model="sasrec", item_dropout=0.2)
+    idonly = next((r for r in base if r.get("model") == "sasrec"
+                   and float(r.get("item_dropout") or 0) == 0), None)
+    users = _spaced(_num(pop, "num_users") or _num(idonly, "num_users"))
+
+    lines: list[str] = []
+
+    def line(text: str) -> None:
+        lines.append(f"- {text}")
+
+    if pop and bpr and idonly:
+        vals = [_num(pop, "Recall@20"), _num(bpr, "Recall@20"), _num(idonly, "Recall@20")]
+        holds = vals[0] < vals[1] < vals[2]
+        line(
+            f"**Ordering holds** — Popular {vals[0]:.4f} < BPR-MF {vals[1]:.4f} < SASRec "
+            f"{vals[2]:.4f} test Recall@20 over {users} evaluated test users "
+            f"({_seeds(pop)} / {_seeds(bpr)} / {_seeds(idonly)} respectively)."
+            if holds else
+            f"**Ordering VIOLATED** — Popular {vals[0]:.4f}, BPR-MF {vals[1]:.4f}, SASRec "
+            f"{vals[2]:.4f} test Recall@20 over {users} evaluated test users. "
+            "This must be diagnosed in the implementation, not tuned away."
+        )
+
+    if idonly and reg:
+        line(
+            f"**Gain_reg** (item-dropout control) = SASRec+item-dropout 0.2 − SASRec = "
+            f"{_gain(_num(reg, 'Recall@20'), _num(idonly, 'Recall@20'))} test Recall@20 "
+            f"over {users} users ({_seeds(reg)} vs {_seeds(idonly)}); "
+            f"NDCG@20 {_gain(_num(reg, 'NDCG@20'), _num(idonly, 'NDCG@20'))}."
+        )
+
+    if mm and reg:
+        line(
+            f"**Gain_content** (over the dropout control) = MM-SASRec gated+ID-dropout 0.2 − "
+            f"SASRec+item-dropout 0.2 = {_gain(_num(mm, 'Recall@20'), _num(reg, 'Recall@20'))} "
+            f"test Recall@20 over {users} users ({_seeds(mm)} vs {_seeds(reg)}); "
+            f"NDCG@20 {_gain(_num(mm, 'NDCG@20'), _num(reg, 'NDCG@20'))}."
+        )
+
+    if mm and idonly:
+        line(
+            f"**Multimodal vs ID-only** = {_spaced(_num(mm, 'num_users'))} users: "
+            f"Recall@20 {_num(idonly, 'Recall@20'):.4f} (ID-only) → {_num(mm, 'Recall@20'):.4f}, "
+            f"NDCG@20 {_num(idonly, 'NDCG@20'):.4f} → {_num(mm, 'NDCG@20'):.4f}."
+        )
+
+    if mm_plain and mm_concat and idonly:
+        line(
+            f"**Fusion without ID dropout** — gated {_num(mm_plain, 'Recall@20'):.4f} vs concat "
+            f"{_num(mm_concat, 'Recall@20'):.4f} test Recall@20 vs ID-only "
+            f"{_num(idonly, 'Recall@20'):.4f} (same {users} users); "
+            f"Δ vs ID-only gated {_gain(_num(mm_plain, 'Recall@20'), _num(idonly, 'Recall@20'))}, "
+            f"concat {_gain(_num(mm_concat, 'Recall@20'), _num(idonly, 'Recall@20'))}."
+        )
+
+    base_lt = [r for r in long_tail if r.get("dataset", "base") == "base"]
+    id_lt = next((r for r in base_lt if r.get("model") == "sasrec"
+                  and float(r.get("item_dropout") or 0) == 0), None)
+    mm_lt = next((r for r in base_lt if r.get("model") == "mm_sasrec"
+                  and float(r.get("id_dropout") or 0) > 0), None)
+    reg_lt = next((r for r in base_lt if r.get("model") == "sasrec"
+                   and float(r.get("item_dropout") or 0) > 0), None)
+    if id_lt and mm_lt:
+        parts = []
+        for bucket in ("head", "middle", "tail"):
+            a, b = _num(id_lt, f"{bucket}_Recall@20"), _num(mm_lt, f"{bucket}_Recall@20")
+            c = _num(reg_lt, f"{bucket}_Recall@20") if reg_lt else None
+            txt = f"{bucket}: ID-only {TBD if a is None else f'{a:.4f}'} → MM {TBD if b is None else f'{b:.4f}'} ({_gain(b, a)})"
+            if c is not None:
+                txt += f", vs dropout control ({c:.4f}) {_gain(b, c)}"
+            parts.append(txt)
+        line(
+            f"**Long tail** (buckets from training interactions only, rule "
+            f"`{long_tail[0].get('bucket_rule', '?')}`, {_seeds(mm_lt)}), Recall@20 — "
+            + "; ".join(parts)
+            + f". Bucket sizes: "
+            + ", ".join(f"{b} {_spaced(_num(id_lt, f'{b}_users'))} users"
+                        for b in ("head", "middle", "tail"))
+            + "."
+        )
+
+    if cold:
+        rand = _pick(cold, model="random")
+        cold_id = _pick(cold, model="sasrec")
+        cold_mm = _pick(cold, model="mm_sasrec", id_dropout=0.2) or _pick(cold, model="mm_sasrec")
+        n_cold = _num(cold_mm or cold_id or rand, "num_cold_items")
+        chance = f"20/{int(n_cold)} = {20 / n_cold:.4f}" if n_cold else TBD
+        line(
+            "**Cold items** (cold catalogue = "
+            f"{_spaced(n_cold)} items, {_spaced(_num(cold_mm or cold_id, 'num_users'))} users with a "
+            f"cold target): cold-only Recall@20 — theoretical uniform ranker {chance}"
+            + (f", measured Random {_num(rand, 'ColdOnly Recall@20'):.4f}" if rand else "")
+            + (f", SASRec ID-only {_num(cold_id, 'ColdOnly Recall@20'):.4f}" if cold_id else "")
+            + (f", MM-SASRec {_num(cold_mm, 'ColdOnly Recall@20'):.4f}" if cold_mm else "")
+            + "."
+        )
+
+    if not lines:
+        return f"_No claims available yet — {TBD}._"
+    lines.append(
+        "_Every value above is computed from `results/tables/*.csv` by "
+        "`analysis/make_readme_tables.py`; recall denominators are the evaluated "
+        "test users named in each line._"
+    )
+    return "\n".join(lines)
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", default=None)
@@ -218,6 +585,10 @@ def main() -> None:
         "COLD": cold_table(),
         "LONGTAIL": long_tail_table(),
         "GAIN": gain_table(),
+        "FINDINGS": findings(),
+        "GATES": gates_table(),
+        "EFFICIENCY": efficiency_table(),
+        "DATASET": dataset_table(),
     }
     text = "\n\n".join(f"<!-- {k} -->\n{v}" for k, v in sections.items())
     if args.out:

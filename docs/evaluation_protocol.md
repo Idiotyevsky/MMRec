@@ -39,14 +39,20 @@ For each user the evaluator:
 
 Test history therefore masks `i1..i6`, and `i7` remains rankable.
 
-Scoring is chunked over items (`evaluation.item_chunk_size`, default 4096) so a
-`batch × num_items` matrix is never materialised in one shot.
+Candidate dot-products are computed in item chunks (`evaluation.item_chunk_size`,
+default 4096), while the batch-level full score matrix is retained for exact
+ranking: the `batch × chunk` product is the largest temporary, and ranking runs
+over the entire catalogue — no candidate pre-filtering and no approximate top-k.
 
-**Rank definition.** `rank = 1 + #{items with a strictly higher score}`. This is
-the optimistic rank: it is deterministic and does not depend on any particular
-sort implementation's tie-breaking. Every metric is a function of this single
-rank array, so overall / cold / per-bucket numbers are guaranteed to come from
-one and the same ranking pass.
+**Rank definition.** `rank = 1 + #{items scoring strictly higher} +
+(#{items scoring equal} − 1) / 2` — the tie-neutral (midpoint) rank. Ties are
+split evenly, so the metric does not depend on any sort implementation's
+tie-breaking, and it is the only tie policy that neither rewards nor punishes a
+model. This matters concretely for cold items: an ID-only model scores every
+cold item exactly 0, and an optimistic rank would report a perfect hit for all
+of them. Every metric is a function of this single rank array, so overall /
+cold / per-bucket numbers are guaranteed to come from one and the same ranking
+pass.
 
 ## 3. Metrics
 

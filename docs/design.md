@@ -111,8 +111,10 @@ One ranking pass per split produces a per-user `rank` array, which is saved to
 of that same array, so they cannot disagree with each other. Chunked item scoring
 keeps memory flat at any catalogue size.
 
-Ranks use the optimistic tie policy (`1 + #{strictly higher}`) — deterministic and
-independent of sort implementation. A target outside a restricted candidate set
+Ranks use the tie-neutral policy
+(`1 + #{strictly higher} + (#{equal} - 1) / 2`) — deterministic, independent of
+sort implementation, and neither rewarding nor punishing ties (an ID-only model
+scores every cold item exactly 0). A target outside a restricted candidate set
 is assigned the `NOT_RETRIEVED` sentinel rather than inheriting a small rank from
 a short candidate list.
 

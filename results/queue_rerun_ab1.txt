@@ -1,0 +1,6 @@
+# Phase 9 re-run: modality ablation, part 1 -- content-only variants.
+# All runs on data/processed/base, fixed code (post autoregressive + NS fix).
+ab_text_only|configs/mm_sasrec_gated.yaml|model.modalities={"id":false,"text":true,"image":false,"video":false}
+ab_image_only|configs/mm_sasrec_gated.yaml|model.modalities={"id":false,"text":false,"image":true,"video":false}
+ab_video_only|configs/mm_sasrec_gated.yaml|model.modalities={"id":false,"text":false,"image":false,"video":true}
+ab_text_image|configs/mm_sasrec_gated.yaml|model.modalities={"id":false,"text":true,"image":true,"video":false}

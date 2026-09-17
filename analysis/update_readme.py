@@ -44,6 +44,7 @@ def main() -> None:
     text = readme.read_text(encoding="utf-8")
     original = text
 
+    injected = []
     for key, body in blocks.items():
         pattern = re.compile(
             rf"(<!-- TABLE:{key} -->\n).*?(\n<!-- /TABLE:{key} -->)", flags=re.S
@@ -52,14 +53,17 @@ def main() -> None:
             print(f"  marker TABLE:{key} not found in README -- skipped")
             continue
         text = pattern.sub(lambda m: m.group(1) + body.strip() + m.group(2), text)
-        print(f"  injected TABLE:{key}")
+        injected.append(key)
 
     if args.check:
         if text != original:
             print("README is out of date; run python analysis/update_readme.py")
             raise SystemExit(1)
-        print("README tables are up to date")
+        print(f"README tables are up to date ({len(injected)} checked)")
         return
+
+    for key in injected:
+        print(f"  injected TABLE:{key}")
 
     readme.write_text(text, encoding="utf-8")
     print(f"wrote {readme}")

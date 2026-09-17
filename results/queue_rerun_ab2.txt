@@ -1,0 +1,6 @@
+# Phase 9 re-run: modality ablation, part 2 -- ID+content pairs, all four
+# modalities, and concatenation fusion, all on data/processed/base.
+ab_id_text|configs/mm_sasrec_gated.yaml|model.modalities={"id":true,"text":true,"image":false,"video":false}
+ab_id_image|configs/mm_sasrec_gated.yaml|model.modalities={"id":true,"text":false,"image":true,"video":false}
+ab_id_text_image_video|configs/mm_sasrec_gated.yaml|model.modalities={"id":true,"text":true,"image":true,"video":true}
+mm_concat|configs/mm_sasrec_concat.yaml|

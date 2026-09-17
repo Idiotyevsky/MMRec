@@ -1,0 +1,9 @@
+# Phase 10-11 re-run: cold-item protocol on data/processed/cold10.
+# Every model gets the same zeroed cold-item ID representation, so only content
+# can help.  cold_random measures the uniform floor whose theoretical cold-only
+# Recall@20 is 20/1974.
+cold_random|configs/random_cold10.yaml|
+cold_sasrec|configs/sasrec_cold10.yaml|
+cold_content_only|configs/mm_sasrec_gated_cold10.yaml|model.modalities={"id":false,"text":true,"image":true,"video":false}
+cold_mm_gated|configs/mm_sasrec_gated_cold10.yaml|
+cold_mm_gated_iddrop|configs/mm_sasrec_gated_iddrop_cold10.yaml|

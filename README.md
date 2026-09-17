@@ -39,11 +39,12 @@ with **ID dropout** so that it cannot lean on the collaborative branch.
 
 ## Motivation
 
-MicroLens-100K is extremely sparse (99.96 % of the user×item matrix is empty) and
-heavily long-tailed: half of the catalogue has ≤ 22 interactions and 376 items
-never appear in a training target at all. A pure-ID sequential model has nothing
-to learn for those items. Content features are available for **every** item, so
-the interesting questions are:
+MicroLens-100K is extremely sparse and heavily long-tailed: at base-split
+training frequencies the median item has a handful of interactions, a few hundred
+items never appear in a training target at all, and the tail holds a large share
+of the catalogue (exact figures in the generated table below). A pure-ID
+sequential model has nothing to learn for those items. Content features are
+available for **every** item, so the interesting questions are:
 
 * Does multimodal content improve overall ranking at all?
 * Text or image — which carries more signal for micro-video?
@@ -56,12 +57,19 @@ the interesting questions are:
 Downloaded from `huggingface.co/datasets/sisuo/Microlens_100k`. Verified schema
 (full write-up in [`docs/data_schema.md`](docs/data_schema.md)):
 
+<!-- TABLE:DATASET -->
+| split | users | items | interactions | sparsity | mean seq len | train interactions | median train item freq | items with 0 train freq | cold items |
+|---|---|---|---|---|---|---|---|---|---|
+| `base` | 100000 | 19738 | 719405 | 0.99964 | 7.19 | 519405 | 15.0 | 376 | 0 |
+| `cold10` | 99942 | 19738 | 659400 | 0.99967 | 6.60 | 459516 | 12.0 | 2300 | 1974 |
+<!-- /TABLE:DATASET -->
+
+Split statistics are generated from the `stats.json` that preprocessing writes
+into each processed dataset (copies committed under `results/dataset_stats/`).
+
 | | |
 |---|---|
-| interactions | 719 405 (`userID`, `itemID`, `timestamp`, `x_label`), tab-separated, header row |
-| users / items | 100 000 / 19 738, both contiguous 0-based ids |
-| sequence length | min 5, median 6, mean 7.19, max 218 |
-| sparsity | 0.99964 |
+| interactions file | `userID`, `itemID`, `timestamp`, `x_label`, tab-separated, header row |
 | duplicates | none — `(userID, itemID)` is unique |
 | text features | (19738, 384) float32, already L2-normalised |
 | image features | (19738, 768) float32, unnormalised (row norm ≈ 25.8) |
@@ -139,8 +147,10 @@ train   : i1 i2 i3 i4 i5        (autoregressive shift inside this window)
 val     : i6                    test: i7
 ```
 
-Full ranking over all 19 738 items, chunked scoring, the user's own history
-masked, the ground truth never masked. Metrics: `Recall@{5,10,20}`,
+Full ranking over all 19 738 items. Candidate dot-products are computed in item
+chunks, while the batch-level full score matrix is retained for exact ranking —
+no candidate pre-filtering, no approximate top-k. The user's own history is
+masked, the ground truth never is. Metrics: `Recall@{5,10,20}`,
 `NDCG@{5,10,20}`, plus `MRR@20` and `Coverage@20`.
 
 **Validation is used for early stopping and is therefore optimistically biased.**
@@ -163,70 +173,48 @@ regenerated from `results/tables/*.csv` by `python analysis/update_readme.py`.
 | Model | Recall@10 | Recall@20 | NDCG@10 | NDCG@20 | MRR@20 | Coverage@20 | Params | #seeds |
 |---|---|---|---|---|---|---|---|---|
 | Popular (train-freq) | 0.0023 | 0.0036 | 0.0011 | 0.0014 | 0.0008 | 0.0025 | 0 | 1 |
-| BPR-MF | 0.0200 | 0.0339 | 0.0098 | 0.0133 | 0.0077 | 0.7420 | 15326720 | 1 |
-| SASRec (ID-only) | 0.0507 ± 0.0013 | 0.0769 ± 0.0013 | 0.0260 ± 0.0008 | 0.0326 ± 0.0008 | 0.0203 ± 0.0007 | 0.8675 ± 0.0019 | 2929792 | 3 |
-| SASRec (ID-only) + item-dropout 0.2 | 0.0533 | 0.0820 | 0.0267 | 0.0339 | 0.0206 | 0.8587 | 2929920 | 1 |
-| SASRec (ID-only) [cold10] | 0.0454 | 0.0691 | 0.0233 | 0.0293 | 0.0183 | 0.7900 | 2929792 | 1 |
-| MM-SASRec (id+image, gated) | 0.0529 | 0.0783 | 0.0271 | 0.0335 | 0.0211 | 0.9114 | 3096322 | 1 |
-| MM-SASRec (id+text, gated) | 0.0508 | 0.0779 | 0.0260 | 0.0328 | 0.0204 | 0.9060 | 3046402 | 1 |
-| MM-SASRec (id+text+image+video, gated) | 0.0513 | 0.0778 | 0.0262 | 0.0329 | 0.0205 | 0.9174 | 3345668 | 1 |
-| MM-SASRec (image, gated) | 0.0317 | 0.0534 | 0.0158 | 0.0212 | 0.0125 | 0.9217 | 536705 | 1 |
-| MM-SASRec (text+image, gated) | 0.0415 | 0.0700 | 0.0204 | 0.0276 | 0.0160 | 0.9177 | 619778 | 1 |
-| MM-SASRec (text, gated) | 0.0314 | 0.0550 | 0.0150 | 0.0210 | 0.0118 | 0.9739 | 486785 | 1 |
-| MM-SASRec (video, gated) | 0.0349 | 0.0570 | 0.0173 | 0.0229 | 0.0136 | 0.8935 | 569985 | 1 |
-| MM-SASRec (id+text+image, concat) | 0.0457 ± 0.0014 | 0.0735 ± 0.0017 | 0.0222 ± 0.0011 | 0.0292 ± 0.0011 | 0.0171 ± 0.0010 | 0.9740 ± 0.0101 | 3212288 | 3 |
-| MM-SASRec (id+text+image, gated) | 0.0509 ± 0.0017 | 0.0769 ± 0.0028 | 0.0259 ± 0.0012 | 0.0325 ± 0.0015 | 0.0202 ± 0.0012 | 0.9057 ± 0.0047 | 3179395 | 2 |
-| MM-SASRec (id+text+image, gated) + ID-dropout 0.2 | 0.0550 | 0.0860 | 0.0280 | 0.0358 | 0.0220 | 0.8846 | 3179395 | 1 |
-| MM-SASRec (id+text+image, gated) [cold10] | 0.0460 | 0.0693 | 0.0236 | 0.0295 | 0.0184 | 0.8964 | 3179395 | 1 |
+| BPR-MF | 0.0198 | 0.0334 | 0.0096 | 0.0131 | 0.0075 | 0.7409 | 15326720 | 1 |
+| SASRec (ID-only) | 0.0852 ± 0.0012 | 0.1224 ± 0.0025 | 0.0463 ± 0.0006 | 0.0557 ± 0.0009 | 0.0371 ± 0.0005 | 0.8017 ± 0.0212 | 2929792 | 3 |
+| SASRec (ID-only) + item-dropout 0.2 | 0.0886 ± 0.0008 | 0.1283 ± 0.0011 | 0.0479 ± 0.0002 | 0.0579 ± 0.0001 | 0.0382 ± 0.0005 | 0.7426 ± 0.0155 | 2929920 | 3 |
+| MM-SASRec (id+text+image, gated) | 0.0868 ± 0.0006 | 0.1267 ± 0.0008 | 0.0466 ± 0.0006 | 0.0567 ± 0.0006 | 0.0372 ± 0.0006 | 0.7388 ± 0.0210 | 3179395 | 3 |
+| MM-SASRec (id+text+image, gated) + ID-dropout 0.2 | 0.0902 ± 0.0012 | 0.1314 ± 0.0007 | 0.0487 ± 0.0007 | 0.0591 ± 0.0005 | 0.0390 ± 0.0005 | 0.7891 ± 0.0183 | 3179395 | 3 |
 <!-- /TABLE:OVERALL -->
 
 ### What the numbers say
 
-1. **The stack is sane.** `Popular (0.0036) < BPR-MF (0.0339) < SASRec (0.0782)`.
-   Sequential modelling beats static collaborative filtering, which beats the
-   popularity prior, by a wide margin. `scripts/smoke_test.py` asserts the same
-   ordering on synthetic data.
+This section is **generated from the tables above** — every value is a
+difference of two cells, and every claim names the number of evaluated test
+users it was computed over. If a run is missing, the claim renders as `TBD`
+rather than as a remembered number.
 
-2. **Adding content naively makes things *worse*.** Gated fusion without ID
-   dropout (0.0754) and concatenation (0.0735) both land *below* the ID-only
-   SASRec (0.0782) while costing more parameters. The gate analysis below shows
-   why: the model keeps ~95 % of the weight on the ID branch.
+<!-- TABLE:FINDINGS -->
+- **Ordering holds** — Popular 0.0036 < BPR-MF 0.0334 < SASRec 0.1224 test Recall@20 over 100 000 evaluated test users (1 run / 1 run / 3 runs respectively).
+- **Gain_reg** (item-dropout control) = SASRec+item-dropout 0.2 − SASRec = +0.0059 test Recall@20 over 100 000 users (3 runs vs 3 runs); NDCG@20 +0.0022.
+- **Gain_content** (over the dropout control) = MM-SASRec gated+ID-dropout 0.2 − SASRec+item-dropout 0.2 = +0.0031 test Recall@20 over 100 000 users (3 runs vs 3 runs); NDCG@20 +0.0012.
+- **Multimodal vs ID-only** = 100 000 users: Recall@20 0.1224 (ID-only) → 0.1314, NDCG@20 0.0557 → 0.0591.
+- **Long tail** (buckets from training interactions only, rule `frequency_quantile`, 3 runs), Recall@20 — head: ID-only 0.1878 → MM 0.2031 (+0.0153), vs dropout control (0.1953) +0.0078; middle: ID-only 0.1185 → MM 0.1270 (+0.0085), vs dropout control (0.1256) +0.0014; tail: ID-only 0.0752 → MM 0.0797 (+0.0045), vs dropout control (0.0794) +0.0003. Bucket sizes: head 33 521 users, middle 21 904 users, tail 44 575 users.
+_Every value above is computed from `results/tables/*.csv` by `analysis/make_readme_tables.py`; recall denominators are the evaluated test users named in each line._
+<!-- /TABLE:FINDINGS -->
 
-3. **Content alone is surprisingly strong.** Text-only (0.0550), image-only
-   (0.0534) and video-only (0.0566) reach roughly 70 % of SASRec's Recall@20 with
-   **5× fewer parameters** and no collaborative signal at all. Text+image without
-   any ID reaches 0.0700.
+Two effects are reported separately, because attributing a drop in the table to
+"content" without a control is the classic way to over-claim:
 
-4. **ID dropout fixes the suppression.** Forcing the model to explain items from
-   content for 20 % of training steps lifts gated fusion from 0.0754 to
-   **0.0846** — **+8.2 % Recall@20 over the ID-only baseline**, the best result
-   in the table.
+* **Gain_reg** = `SASRec + item-dropout` − `SASRec`: what masking part of the
+  *ID* embedding buys on its own, with no content available at all.
+* **Gain_content** = `MM-SASRec gated + ID-dropout` − `SASRec + item-dropout`:
+  what content buys *on top of* that regularisation.
 
-5. **That gain is not just extra regularisation — but it is not all content
-   either.** `SASRec + item-dropout` (the control that masks the *whole* item
-   embedding, i.e. dropout with no content available) reaches 0.0820. Against
-   that control the multimodal model still gains on the middle and tail buckets
-   and is flat on the head — see the gain table. Both effects are real, and the
-   table separates them instead of attributing everything to content.
+The per-bucket breakdown of both is in the gain table below.
 
 ### Modality / fusion ablation
 
 <!-- TABLE:ABLATION -->
 | Kind | ID | Text | Image | Video | Fusion | ID-dropout | Item-dropout | Recall@10 | Recall@20 | NDCG@20 | Params |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| ID-only | ✓ |  |  |  | - | — | — | 0.0507 ± 0.0013 | 0.0769 ± 0.0013 | 0.0326 ± 0.0008 | 2929792 |
-| ID-only | ✓ |  |  |  | - | — | 0.2 | 0.0533 | 0.0820 | 0.0339 | 2929920 |
-| MM |  |  |  | ✓ | gated | — | — | 0.0349 | 0.0570 | 0.0229 | 569985 |
-| MM |  |  | ✓ |  | gated | — | — | 0.0317 | 0.0534 | 0.0212 | 536705 |
-| MM |  | ✓ |  |  | gated | — | — | 0.0314 | 0.0550 | 0.0210 | 486785 |
-| MM |  | ✓ | ✓ |  | gated | — | — | 0.0415 | 0.0700 | 0.0276 | 619778 |
-| MM | ✓ |  | ✓ |  | gated | — | — | 0.0529 | 0.0783 | 0.0335 | 3096322 |
-| MM | ✓ | ✓ |  |  | gated | — | — | 0.0508 | 0.0779 | 0.0328 | 3046402 |
-| MM | ✓ | ✓ | ✓ |  | concat | — | — | 0.0478 ± 0.0031 | 0.0749 ± 0.0026 | 0.0305 ± 0.0021 | 3212288 |
-| MM | ✓ | ✓ | ✓ |  | gated | 0.2 | — | 0.0550 | 0.0860 | 0.0358 | 3179395 |
-| MM | ✓ | ✓ | ✓ | ✓ | gated | — | — | 0.0513 | 0.0778 | 0.0329 | 3345668 |
-| ID-only | ✓ |  |  |  | - | — | — | 0.0454 | 0.0691 | 0.0293 | 2929792 |
-| MM | ✓ | ✓ | ✓ |  | gated | — | — | 0.0460 | 0.0693 | 0.0295 | 3179395 |
+| ID-only | ✓ |  |  |  | - | — | — | 0.0852 ± 0.0012 | 0.1224 ± 0.0025 | 0.0557 ± 0.0009 | 2929792 |
+| ID-only | ✓ |  |  |  | - | — | 0.2 | 0.0886 ± 0.0008 | 0.1283 ± 0.0011 | 0.0579 ± 0.0001 | 2929920 |
+| MM | ✓ | ✓ | ✓ |  | gated | — | — | 0.0868 ± 0.0006 | 0.1267 ± 0.0008 | 0.0567 ± 0.0006 | 3179395 |
+| MM | ✓ | ✓ | ✓ |  | gated | 0.2 | — | 0.0902 ± 0.0012 | 0.1314 ± 0.0007 | 0.0591 ± 0.0005 | 3179395 |
 <!-- /TABLE:ABLATION -->
 
 ### Cold-item evaluation
@@ -240,18 +228,13 @@ at inference for every model. 25 345 evaluation targets are cold.
 content quality).
 
 <!-- TABLE:COLD -->
-| Model | Cold Recall@10 | Cold Recall@20 | Cold NDCG@10 | Cold NDCG@20 | ColdOnly Recall@10 | ColdOnly Recall@20 | #users with cold target |
-|---|---|---|---|---|---|---|---|
-| MM-SASRec (id+text+image, gated) [cold10] | 0.0001 | 0.0002 | 0.0000 | 0.0001 | 0.0091 | 0.0167 | 12717 |
-| SASRec (ID-only) [cold10] | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 12717 |
+_No cold-split runs finished yet — TBD._
 <!-- /TABLE:COLD -->
 
-The result is blunt: **an ID-only sequential model scores exactly zero on cold
-items.** With no collaborative signal and its ID embedding zeroed, it cannot rank
-a cold item above the others at all. The multimodal model recovers a small but
-strictly positive signal (0.0003 end-to-end, 0.0192 when ranking only among cold
-candidates). This is the clearest evidence in the project that content features
-do something collaborative signal structurally cannot.
+The table above is the result: whether the ID-only model is exactly zero and how
+much the multimodal model recovers is read off it (and off the generated findings
+below), not remembered here. What the comparison is designed to test is that
+content features can do something the collaborative signal structurally cannot.
 
 Ranks use the **average-rank tie policy**: with an optimistic policy the 1 974
 cold items all tied at score 0 would each be reported as a perfect hit, which
@@ -264,22 +247,12 @@ _Popularity rule: `frequency_quantile` (training interactions only)._
 
 | Model | Head Recall@20 | Middle Recall@20 | Tail Recall@20 | Head NDCG@20 | Middle NDCG@20 | Tail NDCG@20 |
 |---|---|---|---|---|---|---|
-| BPR-MF | 0.0720 | 0.0250 | 0.0095 | 0.0290 | 0.0098 | 0.0031 |
-| MM-SASRec (id+image, gated) | 0.1346 | 0.0695 | 0.0403 | 0.0594 | 0.0299 | 0.0157 |
-| MM-SASRec (id+text, gated) | 0.1326 | 0.0708 | 0.0403 | 0.0577 | 0.0302 | 0.0154 |
-| MM-SASRec (id+text+image+video, gated) | 0.1365 | 0.0683 | 0.0384 | 0.0589 | 0.0299 | 0.0148 |
-| MM-SASRec (image, gated) | 0.1119 | 0.0347 | 0.0186 | 0.0466 | 0.0129 | 0.0063 |
-| MM-SASRec (text+image, gated) | 0.1347 | 0.0539 | 0.0292 | 0.0555 | 0.0207 | 0.0099 |
-| MM-SASRec (text, gated) | 0.1104 | 0.0348 | 0.0233 | 0.0433 | 0.0129 | 0.0081 |
-| MM-SASRec (video, gated) | 0.1251 | 0.0397 | 0.0142 | 0.0527 | 0.0144 | 0.0046 |
-| MM-SASRec (id+text+image, concat) | 0.1288 | 0.0585 | 0.0369 | 0.0517 | 0.0224 | 0.0134 |
-| MM-SASRec (id+text+image, gated) | 0.1321 | 0.0663 | 0.0361 | 0.0582 | 0.0276 | 0.0131 |
-| MM-SASRec (id+text+image, gated) + ID-dropout 0.2 | 0.1462 | 0.0803 | 0.0435 | 0.0624 | 0.0341 | 0.0166 |
+| BPR-MF | 0.0719 | 0.0240 | 0.0091 | 0.0289 | 0.0094 | 0.0029 |
+| MM-SASRec (id+text+image, gated) | 0.2103 ± 0.0045 | 0.1204 ± 0.0018 | 0.0670 ± 0.0036 | 0.0996 ± 0.0013 | 0.0527 ± 0.0007 | 0.0264 ± 0.0018 |
+| MM-SASRec (id+text+image, gated) + ID-dropout 0.2 | 0.2031 ± 0.0020 | 0.1270 ± 0.0045 | 0.0797 ± 0.0024 | 0.0968 ± 0.0008 | 0.0565 ± 0.0011 | 0.0321 ± 0.0013 |
 | Popular (train-freq) | 0.0106 | 0.0000 | 0.0000 | 0.0043 | 0.0000 | 0.0000 |
-| SASRec (ID-only) | 0.1362 | 0.0696 | 0.0392 | 0.0602 | 0.0304 | 0.0149 |
-| SASRec (ID-only) + item-dropout 0.2 | 0.1457 | 0.0735 | 0.0382 | 0.0619 | 0.0310 | 0.0142 |
-| MM-SASRec (id+text+image, gated) [cold10] | 0.1331 | 0.0697 | 0.0263 | 0.0591 | 0.0284 | 0.0100 |
-| SASRec (ID-only) [cold10] | 0.1369 | 0.0681 | 0.0241 | 0.0610 | 0.0271 | 0.0090 |
+| SASRec (ID-only) | 0.1878 ± 0.0040 | 0.1185 ± 0.0042 | 0.0752 ± 0.0006 | 0.0885 ± 0.0025 | 0.0538 ± 0.0022 | 0.0320 ± 0.0008 |
+| SASRec (ID-only) + item-dropout 0.2 | 0.1953 ± 0.0025 | 0.1256 ± 0.0021 | 0.0794 ± 0.0004 | 0.0923 ± 0.0005 | 0.0564 ± 0.0005 | 0.0327 ± 0.0004 |
 <!-- /TABLE:LONGTAIL -->
 
 ### Where does the multimodal gain come from?
@@ -287,71 +260,79 @@ _Popularity rule: `frequency_quantile` (training interactions only)._
 <!-- TABLE:GAIN -->
 | Model | ΔHead vs SASRec | ΔMiddle vs SASRec | ΔTail vs SASRec | ΔHead vs ID+item-drop | ΔMiddle vs ID+item-drop | ΔTail vs ID+item-drop |
 |---|---|---|---|---|---|---|
-| MM-SASRec (id+image, gated) | -0.0016 | -0.0000 | +0.0011 | -0.0111 | -0.0040 | +0.0021 |
-| MM-SASRec (id+text, gated) | -0.0035 | +0.0012 | +0.0011 | -0.0131 | -0.0028 | +0.0020 |
-| MM-SASRec (id+text+image+video, gated) | +0.0003 | -0.0013 | -0.0008 | -0.0092 | -0.0053 | +0.0002 |
-| MM-SASRec (image, gated) | -0.0243 | -0.0349 | -0.0206 | -0.0338 | -0.0389 | -0.0197 |
-| MM-SASRec (text+image, gated) | -0.0015 | -0.0157 | -0.0100 | -0.0110 | -0.0196 | -0.0090 |
-| MM-SASRec (text, gated) | -0.0257 | -0.0348 | -0.0159 | -0.0353 | -0.0388 | -0.0150 |
-| MM-SASRec (video, gated) | -0.0110 | -0.0299 | -0.0250 | -0.0206 | -0.0339 | -0.0240 |
-| MM-SASRec (id+text+image, concat) | -0.0073 | -0.0111 | -0.0023 | -0.0169 | -0.0151 | -0.0014 |
-| MM-SASRec (id+text+image, gated) | -0.0040 | -0.0032 | -0.0031 | -0.0136 | -0.0072 | -0.0021 |
-| MM-SASRec (id+text+image, gated) + ID-dropout 0.2 | +0.0100 | +0.0107 | +0.0043 | +0.0005 | +0.0068 | +0.0052 |
+| MM-SASRec (id+text+image, gated) | +0.0225 | +0.0019 | -0.0082 | +0.0150 | -0.0052 | -0.0124 |
+| MM-SASRec (id+text+image, gated) + ID-dropout 0.2 | +0.0153 | +0.0085 | +0.0045 | +0.0078 | +0.0014 | +0.0003 |
 <!-- /TABLE:GAIN -->
 
-Read the last row: against the regularisation control, ID dropout adds
-`+0.0005` on head items, `+0.0068` on the middle and `+0.0052` on the tail —
-essentially **all of the content contribution lands in the middle and tail**,
-exactly where collaborative signal is thin.
+Read the last row against the regularisation control: the split of the content
+contribution across head / middle / tail is whatever the generated table above
+shows — it is not restated here.
 
 ### Gate analysis
 
 `python scripts/export_gates.py --run-dir <mm run>` then
 `python analysis/analyze_gates.py` produce
-`results/figures/modality_gate_distribution.png`. Measured on the trained gated
-model, mean fusion weight by training-frequency bucket:
+`results/figures/modality_gate_distribution.png` and the table below.  Only runs
+that carry a `run_manifest.json` contribute; the plain-gated and ID-dropout
+variants are kept in separate rows because they answer different questions.
 
-| modality | head | middle | tail |
-|---|---|---|---|
-| ID | 0.974 | 0.966 | 0.947 |
-| text | 0.015 | 0.019 | 0.030 |
-| image | 0.011 | 0.015 | 0.023 |
+<!-- TABLE:GATES -->
+_Mean over 6 documented run(s), from `results/tables/gate_by_bucket.csv`._
 
-The expected trend **is** present — the ID weight falls and both content weights
-rise monotonically from head to tail — but the magnitude is tiny. The model
-prefers the ID branch almost everywhere, which is exactly why plain gated fusion
-underperforms the ID-only baseline and why ID dropout is needed.
+| Model | Modality | Head | Middle | Tail |
+|---|---|---|---|---|
+| mm_sasrec | id | 0.964 | 0.965 | 0.954 |
+| mm_sasrec | image | 0.013 | 0.013 | 0.019 |
+| mm_sasrec | text | 0.024 | 0.022 | 0.027 |
+| mm_sasrec_iddrop | id | 0.967 | 0.961 | 0.939 |
+| mm_sasrec_iddrop | image | 0.016 | 0.019 | 0.029 |
+| mm_sasrec_iddrop | text | 0.017 | 0.020 | 0.033 |
+<!-- /TABLE:GATES -->
+
+If the ID gate dominates everywhere, that is the mechanism behind the plain-gated
+result — but the claim is the measured table, not this sentence.
 
 ## Efficiency
 
-| | |
+<!-- TABLE:EFFICIENCY -->
+|  | value |
 |---|---|
-| SASRec parameters | 2 929 792 |
-| MM-SASRec parameters | 3 179 395 (+8.5 %) |
-| training throughput | ~12 s/epoch (SASRec), ~15 s/epoch (MM-SASRec) on one L40S |
-| evaluation | full ranking of 100 000 users in ~4 s |
-| item embedding table | 19 739 × 128 float32 = 9.6 MB |
-| ANN index | `faiss.IndexFlatIP`, build 0.06 s, ~1.2 ms/query |
+| SASRec (ID-only) parameters | 2 929 792 |
+| MM-SASRec (gated) parameters | 3 179 395 (+8.5 %) |
+| epochs trained (SASRec / MM) | 80 / 70 |
+| wall time per epoch (SASRec / MM) | 14.4 / 20.8 s |
+| total training time (SASRec / MM) | 1 164 / 1 457 s |
+| evaluation | full ranking, 100 000 users x 19 738 items |
+| runs behind these numbers | 6 |
+| ANN index | faiss.IndexFlatIP |
+| ANN build / query latency | 0.0417 s / 0.5017 ms per query |
+<!-- /TABLE:EFFICIENCY -->
 
-The +8.5 % parameter cost buys +8.2 % Recall@20 (with ID dropout) — but only when
-the model is actually forced to use the content branches.
+Parameter counts, epoch counts and wall-clock times are read from the runs' own
+manifests and `training_log.csv`; index timings from
+`results/runs/<id>/retrieval_benchmark.json`.
 
 Retrieval uses `faiss.IndexFlatIP` over L2-normalised embeddings (cosine), with an
 **exact** numpy/torch fallback so the project still runs when faiss is absent.
-Per-run timings are in `results/runs/<id>/retrieval_benchmark.json`.
 
 ## Semantic ID extension
 
 Content embeddings are quantised into Semantic IDs with an RQVAE, and a small
 causal Transformer generates the next item's ID instead of scoring vectors.
 
+**Status: paused** while the discriminative results stabilise. The numbers below
+quantise the raw per-modality-normalised text+image features and are recorded in
+`artifacts/semantic_id_report_content.json`; they do not depend on any
+recommender checkpoint. (`artifacts/semantic_id_report_fused.json` does — it was
+built from a pre-fix run's fused embeddings and is legacy.)
+
 | | |
 |---|---|
 | quantiser | RQVAE, 4 levels × 256 codes, latent 64 |
-| reconstruction cosine | 0.681 |
-| codebook utilisation | 100 % at every level |
+| reconstruction cosine | 0.681 (`artifacts/semantic_id_report_content.json`) |
+| codebook utilisation | `[1.0, 1.0, 1.0, 1.0]` |
 | unique Semantic IDs | 19 692 / 19 738 items |
-| collision rate | **0.23 %** |
+| collision rate | **0.233 %** |
 
 Getting there required fixing three things that are easy to get wrong, all
 documented in the code:
@@ -364,10 +345,11 @@ documented in the code:
 * **per-modality normalisation** — raw text is unit-norm while raw image has norm
   ≈ 26, so an un-normalised concatenation lets the image block dominate.
 
-With random codebook initialisation and a codebook-only loss the collision rate
-was **49 %**, which would have made generative retrieval meaningless. The
-remaining 0.23 % of collisions are handled explicitly rather than ignored: the
-mapper stores `SID → [items]` and expands colliding candidates.
+An early variant with random codebook initialisation and a codebook-only loss
+collided heavily enough to make generative retrieval meaningless. No artifact
+from that variant was archived, so no number is quoted for it. The residual
+0.233 % of collisions in the current configuration is handled explicitly rather
+than ignored: the mapper stores `SID → [items]` and expands colliding candidates.
 
 Decoding is constrained by a prefix trie (`PrefixConstraint`), so the generator
 can only emit a code tuple that corresponds to a real item — never a hallucinated

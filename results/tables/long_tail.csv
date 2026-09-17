@@ -1,0 +1,15 @@
+tag,model,dataset,fusion,modalities,seed,id_dropout,item_dropout,bucket_rule,head_users,head_Recall@20,head_NDCG@20,middle_users,middle_Recall@20,middle_NDCG@20,tail_users,tail_Recall@20,tail_NDCG@20,run_id
+bpr,bpr,base,-,-,42,0.0,0.0,frequency_quantile,33521,0.071895,0.028933,21904,0.023968,0.009427,44575,0.009063,0.002928,bpr_20260917-052736_83d397
+mm_gated,mm_sasrec,base,gated,id+text+image,42,0.0,0.0,frequency_quantile,33521,0.215447,0.100994,21904,0.120982,0.052914,44575,0.063915,0.024783,mm_gated_20260917-053644_dfe900
+mm_gated_iddrop,mm_sasrec,base,gated,id+text+image,42,0.2,0.0,frequency_quantile,33521,0.204767,0.096634,21904,0.1271,0.056474,44575,0.077757,0.030924,mm_gated_iddrop_20260917-053644_ec427f
+mm_gated_iddrop_s2026,mm_sasrec,base,gated,id+text+image,2026,0.2,0.0,frequency_quantile,33521,0.203604,0.097592,21904,0.131392,0.05757,44575,0.079035,0.031855,mm_gated_iddrop_s2026_20260917-060143_87b54b
+mm_gated_iddrop_s3407,mm_sasrec,base,gated,id+text+image,3407,0.2,0.0,frequency_quantile,33521,0.200829,0.096093,21904,0.122398,0.055423,44575,0.082356,0.033463,mm_gated_iddrop_s3407_20260917-062440_09e6f2
+mm_gated_s2026,mm_sasrec,base,gated,id+text+image,2026,0.0,0.0,frequency_quantile,33521,0.207631,0.098429,21904,0.121804,0.05325,44575,0.066091,0.026054,mm_gated_s2026_20260917-055019_00d3df
+mm_gated_s3407,mm_sasrec,base,gated,id+text+image,3407,0.0,0.0,frequency_quantile,33521,0.20781,0.099334,21904,0.11838,0.051876,44575,0.070869,0.028404,mm_gated_s3407_20260917-060306_0cecfd
+popular,popular,base,-,-,42,0.0,0.0,frequency_quantile,33521,0.01062,0.004264,21904,0.0,0.0,44575,0.0,0.0,popular_20260917-052720_ef9928
+sasrec,sasrec,base,-,id,42,0.0,0.0,frequency_quantile,33521,0.192417,0.091348,21904,0.122991,0.056109,44575,0.07585,0.031074,sasrec_20260917-060603_47936c
+sasrec_itemdrop,sasrec,base,-,id,42,0.0,0.2,frequency_quantile,33521,0.195221,0.091854,21904,0.125365,0.056947,44575,0.079686,0.032541,sasrec_itemdrop_20260917-053644_26a598
+sasrec_itemdrop_s2026,sasrec,base,-,id,2026,0.0,0.2,frequency_quantile,33521,0.197727,0.092817,21904,0.127739,0.055922,44575,0.078901,0.032434,sasrec_itemdrop_s2026_20260917-055725_ff738d
+sasrec_itemdrop_s3407,sasrec,base,-,id,3407,0.0,0.2,frequency_quantile,33521,0.192805,0.092349,21904,0.12363,0.056242,44575,0.079529,0.033135,sasrec_itemdrop_s3407_20260917-061912_d426c1
+sasrec_s2026,sasrec,base,-,id,2026,0.0,0.0,frequency_quantile,33521,0.185197,0.087412,21904,0.114637,0.051836,44575,0.074661,0.032648,sasrec_s2026_20260917-060412_61f903
+sasrec_s3407,sasrec,base,-,id,3407,0.0,0.0,frequency_quantile,33521,0.185645,0.086727,21904,0.117924,0.05332,44575,0.075087,0.032327,sasrec_s3407_20260917-062531_92799b

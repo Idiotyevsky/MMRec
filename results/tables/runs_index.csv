@@ -1,0 +1,15 @@
+run_id,tag,model,fusion,modalities,seed,id_dropout,item_dropout,params,git_sha,git_dirty,dataset_hash,config_hash,best_epoch,epochs,train_time_s,provenance
+bpr_20260917-052736_83d397,bpr,bpr,-,-,42,0.0,0.0,15326720,cc06c207bea3bf71088310caaccbe2d3b61d1d07,False,71a1309e99c48ae9faf3d22bfc3aa081,ef6ed64249d6a079,299,300,2174.595839,True
+mm_gated_20260917-053644_dfe900,mm_gated,mm_sasrec,gated,id+text+image,42,0.0,0.0,3179395,cc06c207bea3bf71088310caaccbe2d3b61d1d07,False,71a1309e99c48ae9faf3d22bfc3aa081,34f7c99959261ad0,20,41,790.962283,True
+mm_gated_s2026_20260917-055019_00d3df,mm_gated_s2026,mm_sasrec,gated,id+text+image,2026,0.0,0.0,3179395,cc06c207bea3bf71088310caaccbe2d3b61d1d07,False,71a1309e99c48ae9faf3d22bfc3aa081,62bbb9a54ad03df4,21,42,744.660624,True
+mm_gated_s3407_20260917-060306_0cecfd,mm_gated_s3407,mm_sasrec,gated,id+text+image,3407,0.0,0.0,3179395,cc06c207bea3bf71088310caaccbe2d3b61d1d07,False,71a1309e99c48ae9faf3d22bfc3aa081,fb3809945ce05cb0,21,42,774.847737,True
+mm_gated_iddrop_20260917-053644_ec427f,mm_gated_iddrop,mm_sasrec,gated,id+text+image,42,0.2,0.0,3179395,cc06c207bea3bf71088310caaccbe2d3b61d1d07,False,71a1309e99c48ae9faf3d22bfc3aa081,2642f014dd5b36c1,50,71,1474.410524,True
+mm_gated_iddrop_s2026_20260917-060143_87b54b,mm_gated_iddrop_s2026,mm_sasrec,gated,id+text+image,2026,0.2,0.0,3179395,cc06c207bea3bf71088310caaccbe2d3b61d1d07,False,71a1309e99c48ae9faf3d22bfc3aa081,1d4d0ebf024eafad,44,65,1353.907136,True
+mm_gated_iddrop_s3407_20260917-062440_09e6f2,mm_gated_iddrop_s3407,mm_sasrec,gated,id+text+image,3407,0.2,0.0,3179395,cc06c207bea3bf71088310caaccbe2d3b61d1d07,False,71a1309e99c48ae9faf3d22bfc3aa081,f01aed726233886d,52,73,1541.761718,True
+popular_20260917-052720_ef9928,popular,popular,-,-,42,0.0,0.0,0,cc06c207bea3bf71088310caaccbe2d3b61d1d07,False,71a1309e99c48ae9faf3d22bfc3aa081,4127bc6e7f28b20a,0,1,3.314906,True
+sasrec_20260917-060603_47936c,sasrec,sasrec,-,id,42,0.0,0.0,2929792,cc06c207bea3bf71088310caaccbe2d3b61d1d07,False,71a1309e99c48ae9faf3d22bfc3aa081,86211600b4ce4a72,42,63,907.691861,True
+sasrec_s2026_20260917-060412_61f903,sasrec_s2026,sasrec,-,id,2026,0.0,0.0,2929792,cc06c207bea3bf71088310caaccbe2d3b61d1d07,False,71a1309e99c48ae9faf3d22bfc3aa081,b3a3fad1f493e900,66,87,1260.746718,True
+sasrec_s3407_20260917-062531_92799b,sasrec_s3407,sasrec,-,id,3407,0.0,0.0,2929792,cc06c207bea3bf71088310caaccbe2d3b61d1d07,False,71a1309e99c48ae9faf3d22bfc3aa081,c2bd251c28850e12,69,90,1323.314892,True
+sasrec_itemdrop_20260917-053644_26a598,sasrec_itemdrop,sasrec,-,id,42,0.0,0.2,2929920,cc06c207bea3bf71088310caaccbe2d3b61d1d07,False,71a1309e99c48ae9faf3d22bfc3aa081,81aa9a2ad3ed2807,61,82,1215.919512,True
+sasrec_itemdrop_s2026_20260917-055725_ff738d,sasrec_itemdrop_s2026,sasrec,-,id,2026,0.0,0.2,2929920,cc06c207bea3bf71088310caaccbe2d3b61d1d07,False,71a1309e99c48ae9faf3d22bfc3aa081,6ed0ea6042a992c6,70,91,1285.149278,True
+sasrec_itemdrop_s3407_20260917-061912_d426c1,sasrec_itemdrop_s3407,sasrec,-,id,3407,0.0,0.2,2929920,cc06c207bea3bf71088310caaccbe2d3b61d1d07,False,71a1309e99c48ae9faf3d22bfc3aa081,96ff26075f047d56,97,118,1740.144967,True

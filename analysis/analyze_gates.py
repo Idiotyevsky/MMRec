@@ -13,11 +13,17 @@ Answers, from real exported weights:
 Writes ``results/figures/modality_gate_distribution.png`` and
 ``results/tables/gate_by_bucket.csv``.  The questions above are *tested*, not
 assumed: if the data does not show the expected trend it is reported as-is.
+
+Provenance gate (same rule as ``analysis/aggregate_results.py``): a run only
+contributes if it carries a ``run_manifest.json``, i.e. it was produced by a
+documented code version.  Manifest-less runs (the pre-autoregressive-fix batch)
+are listed and skipped, never silently averaged in.
 """
 
 from __future__ import annotations
 
 import csv
+import json
 from pathlib import Path
 
 import matplotlib
@@ -25,6 +31,7 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
+import yaml  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
 RUNS = ROOT / "results" / "runs"
@@ -33,49 +40,92 @@ TABLES = ROOT / "results" / "tables"
 BUCKET_NAMES = {0: "tail", 1: "middle", 2: "head"}
 
 
-def _gate_files() -> list[Path]:
-    return sorted(RUNS.glob("*/gate_weights.npz"))
+def _manifest(run_dir: Path) -> dict | None:
+    try:
+        return json.loads((run_dir / "run_manifest.json").read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+
+
+def _variant(run_dir: Path) -> str:
+    """``mm_gated`` / ``mm_gated_iddrop`` -- read from the run's own config copy."""
+    try:
+        cfg = yaml.safe_load((run_dir / "config.yaml").read_text(encoding="utf-8")) or {}
+    except OSError:
+        return run_dir.name
+    m = cfg.get("model", {}) or {}
+    name = str(m.get("name", "?"))
+    if name == "sasrec":
+        return "sasrec" if float(m.get("id_dropout_prob") or m.get("item_dropout_prob") or 0) == 0 else "sasrec_reg"
+    drop = float(m.get("id_dropout_prob") or 0)
+    return f"{name}_iddrop" if drop > 0 else name
+
+
+def _gate_files() -> tuple[list[Path], list[str]]:
+    """Gate exports of documented runs; manifest-less ones are reported, not used."""
+    files, skipped = [], []
+    for p in sorted(RUNS.glob("*/gate_weights.npz")):
+        if _manifest(p.parent) is None:
+            skipped.append(p.parent.name)
+        else:
+            files.append(p)
+    return files, skipped
 
 
 def main() -> None:
-    files = _gate_files()
+    files, skipped = _gate_files()
+    if skipped:
+        print(f"skipping {len(skipped)} manifest-less run(s): {', '.join(skipped)}")
     if not files:
         print("no gate_weights.npz found -- run scripts/export_gates.py first")
+        # a stale table from an older code version must not survive as if current
+        TABLES.mkdir(parents=True, exist_ok=True)
+        with open(TABLES / "gate_by_bucket.csv", "w", newline="", encoding="utf-8") as f:
+            csv.DictWriter(f, fieldnames=["model", "run", "bucket", "modality",
+                                          "mean_gate"]).writeheader()
         return
 
     FIGURES.mkdir(parents=True, exist_ok=True)
     TABLES.mkdir(parents=True, exist_ok=True)
 
+    by_variant: dict[str, list[Path]] = {}
+    for p in files:
+        by_variant.setdefault(_variant(p.parent), []).append(p)
+
     rows: list[dict] = []
-    fig, axes = plt.subplots(1, len(files), figsize=(6 * len(files), 4.4), squeeze=False)
+    fig, axes = plt.subplots(1, len(by_variant), figsize=(6 * len(by_variant), 4.4), squeeze=False)
 
-    for ax, path in zip(axes[0], files):
-        d = np.load(path)
-        run = path.parent.name
-        item_ids = d["item_id"]
-        valid = item_ids > 0
-        mods = sorted(k[len("gate_"):] for k in d.files if k.startswith("gate_"))
-        bucket = d["bucket"]
-        is_cold = d["is_cold"].astype(bool)
-
-        # ---- gate by popularity bucket ----
+    for ax, (variant, paths) in zip(axes[0], sorted(by_variant.items())):
+        mods: list[str] = []
+        for path in paths:
+            d = np.load(path)
+            run = path.parent.name
+            valid = d["item_id"] > 0
+            mods = sorted(k[len("gate_"):] for k in d.files if k.startswith("gate_"))
+            bucket = d["bucket"]
+            is_cold = d["is_cold"].astype(bool)
+            for m in mods:
+                g = d[f"gate_{m}"]
+                for b_idx, b in zip((2, 1, 0), ("head", "middle", "tail")):
+                    rows.append({"model": variant, "run": run, "bucket": b,
+                                 "modality": m,
+                                 "mean_gate": float(g[valid & (bucket == b_idx)].mean())})
+                if is_cold.any():
+                    rows.append({"model": variant, "run": run, "bucket": "cold",
+                                 "modality": m,
+                                 "mean_gate": float(g[is_cold].mean())})
+        # mean over the seeds of this variant
         xs, width = np.arange(3), 0.8 / max(len(mods), 1)
         for i, m in enumerate(mods):
-            g = d[f"gate_{m}"]
-            means = [float(g[valid & (bucket == b)].mean()) for b in (2, 1, 0)]
+            means = [float(np.mean([r["mean_gate"] for r in rows
+                                    if r["model"] == variant and r["modality"] == m
+                                    and r["bucket"] == b]))
+                     for b in ("head", "middle", "tail")]
             ax.bar(xs + i * width - 0.4 + width / 2, means, width, label=m)
-            for b, mean in zip(("head", "middle", "tail"), means):
-                rows.append({"run": run, "bucket": b, "modality": m, "mean_gate": mean})
-        if is_cold.any():
-            for m in mods:
-                rows.append({
-                    "run": run, "bucket": "cold", "modality": m,
-                    "mean_gate": float(d[f"gate_{m}"][is_cold].mean()),
-                })
         ax.set_xticks(xs)
         ax.set_xticklabels(["Head", "Middle", "Tail"])
         ax.set_ylabel("mean gate weight")
-        ax.set_title(run, fontsize=8)
+        ax.set_title(f"{variant} (n={len(paths)} run{'s' if len(paths) > 1 else ''})", fontsize=9)
         ax.grid(axis="y", alpha=0.3)
         ax.legend(fontsize=8)
 
@@ -103,21 +153,24 @@ def main() -> None:
     fig.savefig(out, dpi=160)
     print(f"wrote {out}")
 
+    fields = ["model", "run", "bucket", "modality", "mean_gate"]
     with open(TABLES / "gate_by_bucket.csv", "w", newline="", encoding="utf-8") as f:
-        w = csv.DictWriter(f, fieldnames=["run", "bucket", "modality", "mean_gate"])
+        w = csv.DictWriter(f, fieldnames=fields)
         w.writeheader()
         for r in rows:
             w.writerow({**r, "mean_gate": round(r["mean_gate"], 6)})
     print(f"wrote {TABLES / 'gate_by_bucket.csv'} ({len(rows)} rows)")
 
     # ---- textual check of the tail-vs-head hypothesis --------------------
-    print("\nID-vs-content gate by bucket (mean over runs):")
-    for m in sorted({r["modality"] for r in rows}):
-        line = [f"{m:>6s}"]
-        for b in ("head", "middle", "tail", "cold"):
-            vals = [r["mean_gate"] for r in rows if r["modality"] == m and r["bucket"] == b]
-            line.append(f"{b}={np.mean(vals):.3f}" if vals else f"{b}=n/a")
-        print("  " + "  ".join(line))
+    print("\nID-vs-content gate by bucket (mean over runs, per variant):")
+    for variant in sorted({r["model"] for r in rows}):
+        for m in sorted({r["modality"] for r in rows}):
+            line = [f"{variant:>14s} {m:>6s}"]
+            for b in ("head", "middle", "tail", "cold"):
+                vals = [r["mean_gate"] for r in rows
+                        if r["model"] == variant and r["modality"] == m and r["bucket"] == b]
+                line.append(f"{b}={np.mean(vals):.3f}" if vals else f"{b}=n/a")
+            print("  " + "  ".join(line))
 
 
 if __name__ == "__main__":

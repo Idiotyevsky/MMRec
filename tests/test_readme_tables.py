@@ -1,0 +1,174 @@
+"""The README tables must be generated, never typed.
+
+These tests pin the two properties that make the generated findings trustworthy:
+a claim is computed from ``results/tables/*.csv`` (change the CSV, change the
+claim), and anything that has not been measured renders as ``TBD`` rather than
+as a remembered number.
+"""
+
+import csv
+
+import pytest
+
+from analysis import make_readme_tables as mrt
+
+OVERALL_FIELDS = [
+    "tag", "dataset", "model", "fusion", "modalities", "id_dropout", "item_dropout",
+    "seed", "Recall@5", "Recall@10", "Recall@20", "NDCG@5", "NDCG@10", "NDCG@20",
+    "MRR@20", "Coverage@20", "num_users", "params", "best_epoch", "train_time_s", "run_id",
+]
+
+
+def _write(tables_dir, name, rows, fields):
+    with open(tables_dir / name, "w", newline="", encoding="utf-8") as f:
+        w = csv.DictWriter(f, fieldnames=fields)
+        w.writeheader()
+        for r in rows:
+            w.writerow({k: r.get(k, "") for k in fields})
+
+
+def _overall_row(tag, model, seed, recall20, ndcg20):
+    return {
+        "tag": tag, "dataset": "base", "model": model, "fusion": "-", "modalities": "id",
+        "id_dropout": "0.0", "item_dropout": "0.0", "seed": seed,
+        "Recall@20": recall20, "NDCG@20": ndcg20, "num_users": "1000",
+        "params": "0", "run_id": f"{tag}_20260101-000000_abc123",
+    }
+
+
+@pytest.fixture()
+def tables(tmp_path, monkeypatch):
+    # both are re-pointed: efficiency_table also reads ROOT/results/ for the
+    # committed dataset stats and retrieval benchmarks, which must not leak
+    # real values into a fixture-driven assertion
+    monkeypatch.setattr(mrt, "TABLES", tmp_path)
+    monkeypatch.setattr(mrt, "ROOT", tmp_path)
+    return tmp_path
+
+
+def test_findings_are_empty_until_runs_exist(tables):
+    text = mrt.findings()
+    assert "TBD" in text
+    assert "Recall@20" not in text  # no remembered number leaks in
+
+
+def test_ordering_claim_comes_from_the_csv(tables):
+    _write(tables, "overall.csv", [
+        _overall_row("popular", "popular", 42, "0.0040", "0.0016"),
+        _overall_row("bpr", "bpr", 42, "0.0300", "0.0120"),
+        _overall_row("sasrec", "sasrec", 42, "0.1200", "0.0550"),
+    ], OVERALL_FIELDS)
+    text = mrt.findings()
+    assert "**Ordering holds**" in text
+    assert "0.0040" in text and "0.0300" in text and "0.1200" in text
+    assert "1 000" in text  # the denominator is named
+
+
+def test_a_violated_ordering_is_reported_as_violated(tables):
+    _write(tables, "overall.csv", [
+        _overall_row("popular", "popular", 42, "0.0040", "0.0016"),
+        _overall_row("bpr", "bpr", 42, "0.0020", "0.0010"),
+        _overall_row("sasrec", "sasrec", 42, "0.1200", "0.0550"),
+    ], OVERALL_FIELDS)
+    text = mrt.findings()
+    assert "**Ordering VIOLATED**" in text
+    assert "diagnosed in the implementation" in text
+
+
+def test_multiseed_runs_render_mean_and_std(tables):
+    _write(tables, "overall.csv", [
+        _overall_row("sasrec", "sasrec", 42, "0.1200", "0.0550"),
+        _overall_row("sasrec_s2026", "sasrec", 2026, "0.1300", "0.0600"),
+    ], OVERALL_FIELDS)
+    text = mrt.overall_table()
+    assert "0.1250 ± 0.0071" in text
+
+
+LONGTAIL_FIELDS = [
+    "tag", "model", "dataset", "fusion", "modalities", "seed", "id_dropout",
+    "item_dropout", "bucket_rule", "num_users", "params",
+    "head_Recall@20", "middle_Recall@20", "tail_Recall@20",
+    "head_NDCG@20", "middle_NDCG@20", "tail_NDCG@20",
+]
+
+
+def test_bucket_metrics_are_averaged_across_seeds(tables):
+    """Regression: a hardcoded metric list left ``tail_Recall@20`` at seed 42.
+
+    The table said "3 runs" while every bucket value came from the first one.
+    """
+    def row(seed, head, tail):
+        return {
+            "tag": "mm", "model": "mm_sasrec", "dataset": "base", "fusion": "gated",
+            "modalities": "id+text+image", "seed": seed, "id_dropout": "0.2",
+            "item_dropout": "0.0", "bucket_rule": "frequency_quantile",
+            "num_users": "100000", "params": "3179395",
+            "head_Recall@20": head, "middle_Recall@20": head, "tail_Recall@20": tail,
+            "head_NDCG@20": head, "middle_NDCG@20": head, "tail_NDCG@20": tail,
+        }
+    _write(tables, "long_tail.csv",
+           [row("42", "0.2000", "0.0800"), row("2026", "0.2100", "0.0900")],
+           LONGTAIL_FIELDS)
+    text = mrt.long_tail_table()
+    assert "0.2050" in text and "0.0850" in text  # the two-seed means
+    assert "0.2000" not in text                   # not the first seed's value
+
+
+def test_identity_fields_are_not_averaged(tables):
+    """``params`` and ``num_users`` identify a run; they must not render as ±."""
+    _write(tables, "overall.csv", [
+        _overall_row("sasrec", "sasrec", 42, "0.1200", "0.0550"),
+        _overall_row("sasrec_s2026", "sasrec", 2026, "0.1300", "0.0600"),
+    ], OVERALL_FIELDS)
+    merged = mrt.group_seeds(mrt.read("overall.csv"))
+    assert len(merged) == 1
+    assert merged[0]["params"] == "0"
+    assert merged[0]["num_users"] == "1000"
+    assert merged[0]["Recall@20"] == "0.1250 ± 0.0071"
+
+
+def test_gates_table_is_empty_without_a_documented_export(tables):
+    _write(tables, "gate_by_bucket.csv", [], ["model", "run", "bucket", "modality", "mean_gate"])
+    assert "TBD" in mrt.gates_table()
+
+
+def test_gates_table_averages_documented_runs(tables):
+    rows = [
+        {"model": "mm_sasrec", "run": "a", "bucket": "head", "modality": "id", "mean_gate": "0.9"},
+        {"model": "mm_sasrec", "run": "b", "bucket": "head", "modality": "id", "mean_gate": "0.8"},
+        {"model": "mm_sasrec_iddrop", "run": "c", "bucket": "head", "modality": "id", "mean_gate": "0.7"},
+    ]
+    _write(tables, "gate_by_bucket.csv", rows, ["model", "run", "bucket", "modality", "mean_gate"])
+    text = mrt.gates_table()
+    assert "| mm_sasrec | id | 0.850 |" in text
+    assert "| mm_sasrec_iddrop | id | 0.700 |" in text  # variants stay separate rows
+    assert "3 documented run(s)" in text
+
+
+RUNS_INDEX_FIELDS = [
+    "run_id", "tag", "model", "fusion", "modalities", "seed", "id_dropout",
+    "item_dropout", "params", "git_sha", "git_dirty", "dataset_hash", "config_hash",
+    "best_epoch", "epochs", "train_time_s", "provenance",
+]
+
+
+def test_efficiency_table_names_its_runs(tables):
+    fields = RUNS_INDEX_FIELDS
+    _write(tables, "runs_index.csv", [{
+        "run_id": "sasrec_20260101-000000_aaa", "tag": "sasrec", "model": "sasrec",
+        "fusion": "-", "modalities": "id", "seed": "42", "id_dropout": "0.0",
+        "item_dropout": "0.0", "params": "100", "best_epoch": "3", "epochs": "10",
+        "train_time_s": "50.0", "git_sha": "x", "git_dirty": "False",
+        "dataset_hash": "d", "config_hash": "c", "provenance": "True",
+    }, {
+        "run_id": "mm_gated_20260101-000000_bbb", "tag": "mm_gated", "model": "mm_sasrec",
+        "fusion": "gated", "modalities": "id+text+image", "seed": "42", "id_dropout": "0.2",
+        "item_dropout": "0.0", "params": "300", "best_epoch": "4", "epochs": "8",
+        "train_time_s": "80.0", "git_sha": "x", "git_dirty": "False",
+        "dataset_hash": "d", "config_hash": "c", "provenance": "True",
+    }], fields)
+    text = mrt.efficiency_table()
+    assert "100" in text and "300" in text
+    assert "+200.0 %" in text
+    assert "5.0 / 10.0 s" in text  # 50 s over 10 epochs, 80 s over 8 epochs
+    assert "runs behind these numbers" in text

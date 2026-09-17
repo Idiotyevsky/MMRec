@@ -1,0 +1,90 @@
+{
+  "num_users": 100000,
+  "num_items": 19738,
+  "num_interactions": 719405,
+  "avg_sequence_length": 7.19405,
+  "median_sequence_length": 6.0,
+  "min_sequence_length": 5,
+  "max_sequence_length": 218,
+  "avg_train_length": 5.19405,
+  "num_train_interactions": 519405,
+  "sparsity": 0.9996355228493262,
+  "item_freq_train": {
+    "min": 0,
+    "max": 546,
+    "median": 15.0,
+    "mean": 26.314976188063632,
+    "num_zero_freq": 376
+  },
+  "popularity_buckets": {
+    "rule": "frequency_quantile",
+    "rule_description": "frequency_quantile: head=top 20% items by train freq, tail=bottom 60% items by train freq, middle=rest",
+    "counts": {
+      "head": 3948,
+      "middle": 3947,
+      "tail": 11843
+    },
+    "interaction_mass": {
+      "head": 0.5878303058307102,
+      "middle": 0.22385999364657638,
+      "tail": 0.18830970052271348
+    }
+  },
+  "cold_split": {
+    "enabled": false,
+    "ratio": 0.0,
+    "seed": 42,
+    "min_eval_occurrences": 1,
+    "num_cold_items": 0,
+    "cold_raw_item_ids": []
+  },
+  "filters": {
+    "min_user_interactions": 5,
+    "min_item_interactions": 1,
+    "max_sequence_length": 50
+  },
+  "raw": {
+    "inter_file": "data/raw/microlens_100k.inter",
+    "feature_dir": "data/raw",
+    "n_raw_interactions": 719405,
+    "n_users_dropped": 0,
+    "n_items_dropped": 0
+  },
+  "features": {
+    "text": {
+      "dim": 384,
+      "mapping": "identity(raw_item_id -> feature_row)"
+    },
+    "image": {
+      "dim": 768,
+      "mapping": "identity(raw_item_id -> feature_row)"
+    },
+    "video": {
+      "dim": 1024,
+      "mapping": "identity(raw_item_id -> feature_row)"
+    }
+  },
+  "target_distribution": {
+    "val": {
+      "mean_train_freq": 52.38828,
+      "median_train_freq": 37.0,
+      "frac_zero_train_freq": 0.00547,
+      "bucket_share": {
+        "head": 0.45405,
+        "middle": 0.23969,
+        "tail": 0.30626
+      }
+    },
+    "test": {
+      "mean_train_freq": 40.05553,
+      "median_train_freq": 25.0,
+      "frac_zero_train_freq": 0.01977,
+      "bucket_share": {
+        "head": 0.33521,
+        "middle": 0.21904,
+        "tail": 0.44575
+      }
+    },
+    "note": "val and test targets are not identically distributed: the last interaction of a user is more long-tailed than the second-to-last"
+  }
+}

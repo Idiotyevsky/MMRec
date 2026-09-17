@@ -83,6 +83,15 @@ def _config_core_hash(cfg: dict) -> str:
     return config_hash(core)
 
 
+def _epochs_trained(run_dir: Path) -> int | None:
+    """Rows in ``training_log.csv`` = epochs actually run (the file has a header)."""
+    try:
+        with open(run_dir / "training_log.csv", newline="", encoding="utf-8") as f:
+            return max(0, sum(1 for _ in f) - 1)
+    except OSError:
+        return None
+
+
 def load_runs(runs_dir: Path = RUNS_DIR) -> list[dict]:
     runs = []
     for d in sorted(runs_dir.iterdir()):
@@ -134,6 +143,7 @@ def load_runs(runs_dir: Path = RUNS_DIR) -> list[dict]:
             "params": train.get("num_parameters"),
             "best_epoch": train.get("best_epoch"),
             "train_time_s": train.get("train_time_s"),
+            "epochs": _epochs_trained(d),
             "val": metrics.get("val", {}),
             "test": metrics.get("test", {}),
             "cold": metrics.get("cold"),
@@ -161,6 +171,7 @@ def _row(r: dict) -> dict:
         "NDCG@20": t.get("NDCG@20"),
         "MRR@20": t.get("MRR@20"),
         "Coverage@20": t.get("Coverage@20"),
+        "num_users": t.get("num_users"),
         "params": r["params"],
         "best_epoch": r["best_epoch"],
         "train_time_s": r["train_time_s"],
@@ -179,12 +190,15 @@ def build_runs_index(runs: list[dict]) -> list[dict]:
             "fusion": r["fusion"],
             "modalities": r["modalities"],
             "seed": r["seed"],
+            "id_dropout": r["id_dropout_prob"],
+            "item_dropout": r["item_dropout_prob"],
             "params": r["params"],
             "git_sha": r["git_sha"],
             "git_dirty": r["git_dirty"],
             "dataset_hash": r["dataset_hash"],
             "config_hash": r["config_hash"],
             "best_epoch": r["best_epoch"],
+            "epochs": r["epochs"],
             "train_time_s": r["train_time_s"],
             "provenance": r["provenance"],
         })
@@ -434,6 +448,40 @@ def print_group_summary(runs: list[dict], metrics=("Recall@20", "NDCG@20")) -> N
         print(line)
 
 
+def sync_dataset_stats() -> None:
+    """Copy the small ``stats.json`` of every processed dataset into ``results/``.
+
+    ``data/processed/`` is not tracked, so without this copy the dataset figures
+    quoted in the README would have no committed artifact behind them.
+    """
+    src = ROOT / "data" / "processed"
+    if not src.is_dir():
+        return
+    out_dir = ROOT / "results" / "dataset_stats"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    for d in sorted(src.iterdir()):
+        stats = d / "stats.json"
+        if stats.exists():
+            (out_dir / f"{d.name}.json").write_text(
+                stats.read_text(encoding="utf-8"), encoding="utf-8"
+            )
+            print(f"  dataset_stats/{d.name}.json")
+
+
+def sync_retrieval_benchmarks(runs: list[dict]) -> None:
+    """Same idea for the index benchmarks: runs/ is not tracked, results/ is."""
+    out_dir = ROOT / "results" / "retrieval_benchmarks"
+    for r in runs:
+        p = r["dir"] / "retrieval_benchmark.json"
+        if not p.exists():
+            continue
+        out_dir.mkdir(parents=True, exist_ok=True)
+        (out_dir / f"{r['run_id']}.json").write_text(
+            p.read_text(encoding="utf-8"), encoding="utf-8"
+        )
+        print(f"  retrieval_benchmarks/{r['run_id']}.json")
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
@@ -473,6 +521,9 @@ def main() -> None:
     _write_csv(build_cold(runs), tables / "cold_start.csv")
     _write_csv(build_long_tail(runs), tables / "long_tail.csv")
     _write_csv(build_runs_index(runs), tables / "runs_index.csv")
+    print("committed artifacts:")
+    sync_dataset_stats()
+    sync_retrieval_benchmarks(runs)
     print_group_summary(runs)
 
 

@@ -1,0 +1,11 @@
+{
+  "backend": "faiss.IndexFlatIP",
+  "num_items": 19739,
+  "dim": 128,
+  "normalized": true,
+  "index_build_time_s": 0.0417,
+  "query_latency_ms_per_query": 0.5017,
+  "queries_per_second": 1993.1,
+  "index_path": "artifacts/item.index",
+  "run_dir": "results/runs/mm_gated_20260917-053644_dfe900"
+}
