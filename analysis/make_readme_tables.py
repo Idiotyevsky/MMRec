@@ -470,9 +470,14 @@ def findings() -> str:
     base = [r for r in overall if r.get("dataset", "base") == "base"]
     pop = _pick(base, model="popular")
     bpr = _pick(base, model="bpr")
-    mm = _pick(base, model="mm_sasrec", fusion="gated", id_dropout=0.2)
-    mm_plain = _pick(base, model="mm_sasrec", fusion="gated", id_dropout=0.0)
-    mm_concat = _pick(base, model="mm_sasrec", fusion="concat", id_dropout=0.0)
+    # the modality set is part of the identity: without it, an ablation row
+    # (which sorts before "mm_gated*") would be quoted as the headline model
+    mm = _pick(base, model="mm_sasrec", fusion="gated", modalities="id+text+image",
+               id_dropout=0.2)
+    mm_plain = _pick(base, model="mm_sasrec", fusion="gated", modalities="id+text+image",
+                     id_dropout=0.0)
+    mm_concat = _pick(base, model="mm_sasrec", fusion="concat", modalities="id+text+image",
+                      id_dropout=0.0)
     reg = _pick(base, model="sasrec", item_dropout=0.2)
     idonly = next((r for r in base if r.get("model") == "sasrec"
                    and float(r.get("item_dropout") or 0) == 0), None)
@@ -532,6 +537,7 @@ def findings() -> str:
     id_lt = next((r for r in base_lt if r.get("model") == "sasrec"
                   and float(r.get("item_dropout") or 0) == 0), None)
     mm_lt = next((r for r in base_lt if r.get("model") == "mm_sasrec"
+                  and r.get("modalities") == "id+text+image"
                   and float(r.get("id_dropout") or 0) > 0), None)
     reg_lt = next((r for r in base_lt if r.get("model") == "sasrec"
                    and float(r.get("item_dropout") or 0) > 0), None)
@@ -557,7 +563,8 @@ def findings() -> str:
     if cold:
         rand = _pick(cold, model="random")
         cold_id = _pick(cold, model="sasrec")
-        cold_mm = _pick(cold, model="mm_sasrec", id_dropout=0.2) or _pick(cold, model="mm_sasrec")
+        cold_mm = (_pick(cold, model="mm_sasrec", modalities="id+text+image", id_dropout=0.2)
+                   or _pick(cold, model="mm_sasrec", modalities="id+text+image"))
         n_cold = _num(cold_mm or cold_id or rand, "num_cold_items")
         chance = f"20/{int(n_cold)} = {20 / n_cold:.4f}" if n_cold else TBD
         line(

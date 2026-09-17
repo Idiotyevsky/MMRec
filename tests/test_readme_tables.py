@@ -127,6 +127,64 @@ def test_identity_fields_are_not_averaged(tables):
     assert merged[0]["Recall@20"] == "0.1250 ± 0.0071"
 
 
+def _mm_row(tag, modalities, id_dropout, recall20, ndcg20="0.0591", n_seeds=1):
+    row = _overall_row(tag, "mm_sasrec", 42, recall20, ndcg20)
+    row.update({"fusion": "gated", "modalities": modalities, "id_dropout": id_dropout,
+                "params": "3179395"})
+    return row
+
+
+def test_findings_quote_the_headline_mm_row_not_an_ablation_row(tables):
+    """Regression: ``_pick`` matched model/fusion/dropout only, so an ablation
+    row (tags sort before ``mm_gated*``) would be quoted as MM-SASRec."""
+    _write(tables, "overall.csv", [
+        _overall_row("popular", "popular", 42, "0.0036", "0.0014"),
+        _overall_row("bpr", "bpr", 42, "0.0334", "0.0131"),
+        _overall_row("sasrec", "sasrec", 42, "0.1224", "0.0557"),
+        _overall_row("sasrec_itemdrop", "sasrec", 42, "0.1283", "0.0579"),
+        # sorted first by tag: an ablation variant with a suspicious value that
+        # matches every headline criterion except the modality set
+        _mm_row("ab_id_text", "id+text", "0.2", "0.9999"),
+        _mm_row("mm_gated_iddrop", "id+text+image", "0.2", "0.1314"),
+    ], OVERALL_FIELDS)
+    text = mrt.findings()
+    assert "0.1314" in text
+    assert "0.9999" not in text
+
+
+def test_long_tail_findings_quote_the_headline_mm_row(tables):
+    def lt_row(tag, modalities, id_dropout, recall20):
+        return {
+            "tag": tag, "model": "mm_sasrec", "dataset": "base", "fusion": "gated",
+            "modalities": modalities, "seed": "42", "id_dropout": id_dropout,
+            "item_dropout": "0.0", "bucket_rule": "frequency_quantile",
+            "num_users": "100000", "params": "3179395",
+            "head_Recall@20": recall20, "middle_Recall@20": recall20,
+            "tail_Recall@20": recall20, "head_NDCG@20": recall20,
+            "middle_NDCG@20": recall20, "tail_NDCG@20": recall20,
+            "head_users": "100", "middle_users": "100", "tail_users": "100",
+        }
+    # findings() reads both files; the bucket picks come from the long-tail one
+    _write(tables, "overall.csv", [
+        _overall_row("popular", "popular", 42, "0.0036", "0.0014"),
+        _overall_row("bpr", "bpr", 42, "0.0334", "0.0131"),
+        _overall_row("sasrec", "sasrec", 42, "0.1224", "0.0557"),
+    ], OVERALL_FIELDS)
+    id_row = lt_row("sasrec", "id", "0.0", "0.1500")
+    id_row["model"] = "sasrec"
+    reg_row = lt_row("sasrec_itemdrop", "id", "0.0", "0.1600")
+    reg_row["model"] = "sasrec"
+    reg_row["item_dropout"] = "0.2"
+    _write(tables, "long_tail.csv", [
+        id_row, reg_row,
+        lt_row("ab_id_text", "id+text", "0.2", "0.9999"),
+        lt_row("mm_gated_iddrop", "id+text+image", "0.2", "0.2000"),
+    ], LONGTAIL_FIELDS)
+    text = mrt.findings()
+    assert "0.9999" not in text
+    assert "0.2000" in text
+
+
 ABLATION_FIELDS = [
     "model", "dataset", "modalities", "ID", "Text", "Image", "Video", "Fusion",
     "item_dropout", "id_dropout", "modality_dropout", "Recall@20", "NDCG@20",
