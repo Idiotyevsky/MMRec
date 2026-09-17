@@ -84,6 +84,15 @@ SASRec+item-dropout 0.2 `0.1283 ± 0.0009` < MM-SASRec gated+ID-dropout 0.2
   which made tag `sasrec` match `sasrec_itemdrop_*` and silently skipped a job
   whose run did not exist. It now matches a full run id
   (`<tag>_<8 digits>-<time>_<hash>/metrics.json`).
+- **Table-hygiene guards for the staged queues** — two ways the incoming
+  ablation/cold runs could have silently corrupted the generated README were
+  closed before they landed: the OVERALL/ABLATION tables now filter to
+  `dataset == "base"` (a cold10 row would otherwise appear as a second,
+  unexplained "ID-only" row), and the gate table keys runs by
+  `model(modalities)@dataset` instead of model name alone (an ablation or
+  cold export would otherwise be averaged into the base gated rows). Pinned by
+  `tests/test_readme_tables.py::test_cold_split_runs_stay_out_of_the_headline_tables`
+  and `tests/test_gate_analysis.py`.
 - **Aggregation guards** (`analysis/aggregate_results.py`) — the aggregator
   refuses to pool runs across different git SHAs, dataset hashes, core configs
   (seed stripped) or parameter counts, keeps the largest mutually compatible
@@ -166,8 +175,10 @@ Queues: `results/queue_main_{a,b,c,d}.txt` (GPU 1/2/3/5) — finished.
    gates for the ablation runs.
 2. Check the measured Random cold-only Recall@20 against the closed form
    20/1974 and record the comparison in the generated findings.
-3. Re-run the retrieval benchmark on the fixed code with the new MM checkpoint
-   (the committed one is from the seed-42 run; the table already names it).
+3. ~~Re-run the retrieval benchmark on the fixed code with the new MM
+   checkpoint~~ — already satisfied: the committed
+   `results/retrieval_benchmarks/mm_gated_20260917-053644_dfe900.json` names a
+   `cc06c20` run (`git_dirty = False`), i.e. it was measured on the fixed code.
 4. Update the README's modality/fusion and cold sections once the runs land —
    the numbers come from `results/tables/*.csv`, so only the queues need care.
 5. Semantic-ID extension (RQVAE + constrained generative decoding).
