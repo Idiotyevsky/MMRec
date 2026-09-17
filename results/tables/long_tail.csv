@@ -11,6 +11,7 @@ ab_text_only,mm_sasrec,base,gated,text,42,0.0,0.0,frequency_quantile,33521,0.173
 ab_video_only,mm_sasrec,base,gated,video,42,0.0,0.0,frequency_quantile,33521,0.203872,0.085562,21904,0.071539,0.02624,44575,0.01447,0.004713,ab_video_only_20260917-084357_3c9f50
 mm_concat,mm_sasrec,base,concat,id+text+image,42,0.0,0.0,frequency_quantile,33521,0.213538,0.100587,21904,0.131392,0.05848,44575,0.08673,0.035974,mm_concat_20260917-075552_b84b95
 mm_concat_iddrop,mm_sasrec,base,concat,id+text+image,42,0.2,0.0,frequency_quantile,33521,0.219743,0.102865,21904,0.138514,0.061548,44575,0.089355,0.03679,mm_concat_iddrop_20260917-082810_d41504
+mm_concat_iddrop_s2026,mm_sasrec,base,concat,id+text+image,2026,0.2,0.0,frequency_quantile,33521,0.218132,0.102458,21904,0.137555,0.060064,44575,0.086932,0.034655,mm_concat_iddrop_s2026_20260917-141212_a71bb8
 mm_concat_s2026,mm_sasrec,base,concat,id+text+image,2026,0.0,0.0,frequency_quantile,33521,0.213001,0.100211,21904,0.134587,0.059408,44575,0.086887,0.035858,mm_concat_s2026_20260917-131630_b6acd8
 mm_concat_s3407,mm_sasrec,base,concat,id+text+image,3407,0.0,0.0,frequency_quantile,33521,0.216819,0.10159,21904,0.132944,0.0591,44575,0.083814,0.034597,mm_concat_s3407_20260917-134354_c04efb
 mm_gated,mm_sasrec,base,gated,id+text+image,42,0.0,0.0,frequency_quantile,33521,0.215447,0.100994,21904,0.120982,0.052914,44575,0.063915,0.024783,mm_gated_20260917-053644_dfe900

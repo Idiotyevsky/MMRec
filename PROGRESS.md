@@ -9,17 +9,20 @@ The project is in a **correctness-audit / re-run phase**. Two training-side bugs
 were found and fixed, every earlier run was quarantined as legacy, a provenance
 and aggregation guard layer was added, and the **main experiment matrix, the
 modality/fusion ablation and the cold-item matrix have all been re-run to
-completion on the fixed code** (33 finished runs spanning ten commits whose
+completion on the fixed code** (35 finished runs spanning twelve commits whose
 result-determining code a human has verified to be equivalent, declared in
 `analysis/code_equivalence.json`; see below).
 
 Numbers in the README are generated from `results/tables/*.csv`; numbers in
 `results/` are produced only by runs that carry a `run_manifest.json`.
 
-Headline result on the fixed code (test Recall@20, 100 000 evaluated users,
-3 seeds each): Popular `0.0036` < BPR-MF `0.0334` < SASRec `0.1224 ± 0.0020` <
-SASRec+item-dropout 0.2 `0.1283 ± 0.0009` < MM-SASRec gated+ID-dropout 0.2
-`0.1314 ± 0.0006` < MM-SASRec concat+ID-dropout 0.2 `0.1438` (1 seed).
+Headline result on the fixed code (test Recall@20, 100 000 evaluated users):
+Popular `0.0036 ± 0.0000` < BPR-MF `0.0331 ± 0.0003` < SASRec `0.1224 ± 0.0020` <
+SASRec+item-dropout 0.2 `0.1283 ± 0.0009` < MM-SASRec gated `0.1267 ± 0.0007` <
+gated+ID-dropout 0.2 `0.1314 ± 0.0006` < concat `0.1393 ± 0.0003` <
+concat+ID-dropout 0.2 `0.1429 ± 0.0009` — every number a 3-seed mean except
+concat+ID-dropout 0.2, which has 2 seeds because the third run was stopped on
+purpose (see the experiment table).
 
 ## Completed
 
@@ -139,10 +142,14 @@ SASRec+item-dropout 0.2 `0.1283 ± 0.0009` < MM-SASRec gated+ID-dropout 0.2
   `0.0874`, video `0.0905`, text+image `0.1126`; paired with ID: id+text
   `0.1176`, id+image `0.1237`; the full gated set `0.1267 ± 0.0008` (3 seeds);
   adding video to id+text+image `0.1271` (1 seed, within the multi-seed std).
-  Fusion at the same modality set and regularisation: concat `0.1390` /
-  concat+ID-dropout 0.2 `0.1438` vs gated `0.1267` / `0.1314 ± 0.0006` — the
-  fusion choice matters more than the modality set, and this is reported as
-  measured, not folded into the gated headline.
+  Fusion at the same modality set and regularisation: concat `0.1393 ± 0.0003` /
+  concat+ID-dropout 0.2 `0.1429 ± 0.0009` (2 seeds) vs gated `0.1267 ± 0.0007` /
+  `0.1314 ± 0.0006` — the fusion choice matters more than the modality set, and
+  this is reported as measured, not folded into the gated headline. The concat
+  arms were multi-seeded precisely so this claim would not rest on one run
+  (`results/queue_rerun_ab5.txt`); the last of those four runs was stopped at
+  82/136 epochs on request, so the concat+ID-dropout mean is over seeds
+  42/2026 only and its row says `2` in the `#seeds` column.
 - **Cold-item matrix (Phase 10) — finished.** All five cold10 runs carry a
   manifest. Cold-only Recall@20 (ranking restricted to the 1 974 cold items,
   12 717 users with a cold target): Random `0.0097` (closed form `0.01013`),
@@ -166,7 +173,7 @@ SASRec+item-dropout 0.2 `0.1283 ± 0.0009` < MM-SASRec gated+ID-dropout 0.2
   in `analysis/code_equivalence.json` (class `ar-fix-2026-09-17`, reference
   `cc06c20`, 14 commits, the same reason), which is what the aggregator reads
   instead of trusting or refusing the SHA, and what the no-run-dropped pooling
-  of the 33 runs is validated against.
+  of the 35 runs is validated against.
 - **Three table-integrity bugs found and fixed (all caught by the generated
   tables, all now pinned by tests)**
   - `group_seeds()` keyed on lowercase `fusion` while `ablation.csv` writes
@@ -198,13 +205,18 @@ SASRec+item-dropout 0.2 `0.1283 ± 0.0009` < MM-SASRec gated+ID-dropout 0.2
 
 ## Verified
 
-- `pytest -q` → 170 passed (unit + regression tests for both training bugs,
+- `pytest -q` → 175 passed (unit + regression tests for both training bugs,
   provenance and aggregation guards, the declared code-equivalence mechanism,
   the README generator, the table-integrity guards, and the Random baseline's
   closed-form cold floor).
-- `python scripts/smoke_test.py` → 14 checks pass on synthetic data: ordering
+- `python scripts/smoke_test.py` re-run at the end of the phase → 14/14 checks
+  pass (`SMOKE TEST PASSED`) on synthetic data: ordering
   `popular < BPR-MF < SASRec`, losses decrease, tiny-overfit reaches < 0.15
   loss, position-wise objective beats the broadcast-objective reference.
+- The declared-equivalence closure fired on real data, not only in tests: one
+  run (`mm_concat_iddrop_s2026`) was produced on commit `7d64721e`, which the
+  file does not list, and it still pools with the class because its
+  result-determining tree is byte-identical to a member's.
 - Real-data preprocessing: base split 100 000 users / 19 738 items / 719 405
   interactions, avg length 7.19, sparsity 0.99964; cold split 1 974 cold items
   with **zero** training interactions and 25 345 cold eval targets
@@ -216,12 +228,13 @@ SASRec+item-dropout 0.2 `0.1283 ± 0.0009` < MM-SASRec gated+ID-dropout 0.2
   `run_manifest.json` reproduce exactly from the run's own `config.yaml`.
 - All 14 main-matrix manifests carry `git_sha = cc06c20` with
   `git_dirty = False` — the batch ran on one committed code version.
-- All 33 run manifests carry `git_dirty = False`, and the aggregator now
+- All 35 run manifests carry `git_dirty = False`, and the aggregator now
   *requires* that exact value before a run may be pooled under a commit-level
   identity, so a run marked dirty (or one whose status check failed, `None`)
-  cannot ride on its SHA — or on a declared class — into an average. The 33
-  runs behind the tables span ten commits, and the `src`/`scripts` diff between
-  them was read rather than assumed empty (see above).
+  cannot ride on its SHA — or on a declared class — into an average. The 35
+  runs behind the tables span twelve commits (twelve of the fourteen declared,
+  plus one — `7d64721e` — that joins through its tree hash), and the
+  `src`/`scripts` diff between them was read rather than assumed empty.
 - Gate analysis on all 6 MM runs (`gate_weights.npz` exported per run and read
   back from the checkpoint, never recomputed): the ID gate dominates
   (~0.96) and is lowest on tail items, while text/image weights rise toward the
@@ -259,13 +272,17 @@ SASRec+item-dropout 0.2 `0.1283 ± 0.0009` < MM-SASRec gated+ID-dropout 0.2
 | D: MM-SASRec gated + ID-dropout 0.2 (3 seeds) | 3 | **finished** |
 | modality / fusion ablation (base) | 9 | **finished** (`queue_rerun_ab1/2/3.txt`) |
 | cold split (Random, SASRec, content-only, gated, gated+ID-dropout) | 5 | **finished** (`queue_rerun_cold.txt`) |
-| concat fusion at seeds 2026/3407 (± ID-dropout 0.2) | 4 | **running** (`queue_rerun_ab5.txt`, GPU 0) |
+| concat fusion at seeds 2026/3407 (± ID-dropout 0.2) | 4 | **3 finished** (`queue_rerun_ab5.txt`, GPU 0): concat seeds 2026/3407 done, concat+ID-dropout seed 2026 done |
+| concat + ID-dropout 0.2 at seed 3407 | 1 | **stopped on request** at 82/136 epochs; not in any table, no manifest |
 | Semantic-ID extension | — | paused until the discriminative results stabilise |
 
 Queues: `results/queue_main_{a,b,c,d}.txt` (GPU 1/2/3/5) — finished;
-`results/queue_rerun_ab4.txt` (Popular + BPR-MF seeds 2026/3407) — finished.
-Total finished runs entering the tables: 33 (all with `run_manifest.json`),
-spanning ten commits of one declared-equivalence class.
+`results/queue_rerun_ab4.txt` (Popular + BPR-MF seeds 2026/3407) — finished;
+`results/queue_rerun_ab5.txt` — 3 of 4, the fourth killed mid-run.
+Total finished runs entering the tables: 35 (all with `run_manifest.json`),
+spanning twelve commits of one declared-equivalence class. An aborted run
+directory was left on disk under `results/runs/` (no `metrics.json`, so no
+table and no aggregator run can pick it up).
 
 ## Next highest-priority tasks
 
@@ -282,10 +299,10 @@ spanning ten commits of one declared-equivalence class.
 4. ~~Update the README's modality/fusion and cold sections once the runs land~~ —
    done; every number is generated from `results/tables/*.csv` and
    `update_readme.py --check` passes.
-5. ~~Multi-seed the concat fusion~~ — in flight: `queue_rerun_ab5.txt` adds
-   seeds 2026/3407 to concat and concat+ID-dropout 0.2 (seed 42 and 2026
-   already landed; 3407 for both settings still running). The cold
-   content-only row is still 1 seed — the cold matrix is a different table and
-   its single-seed status is stated in the generated finding rather than
-   implied away.
+5. ~~Multi-seed the concat fusion~~ — done for concat (3 seeds). Still open by
+   choice, not by accident: concat+ID-dropout 0.2 has 2 seeds (42/2026; the
+   seed-3407 run was stopped on request) and the cold content-only row has 1.
+   Both are stated in the generated tables (`#seeds`) and findings rather than
+   implied away. Re-running `queue_rerun_ab5.txt` would fill only that line
+   (the runner skips the tag that already has `metrics.json`).
 6. Semantic-ID extension (RQVAE + constrained generative decoding).
