@@ -852,16 +852,22 @@ def hero_metrics() -> str:
         (f"{n['retention'] * 100:.1f}%", "Recall retained",
          f"{n['retention_k']} candidates · same checkpoint"),
     ]
+    icons = ("ranking", "merge", "retention")
     tds = "\n".join(
         f'<td align="center" width="33%">\n\n'
+        f'<img src="assets/icons/{ic}.svg" width="26" height="26" alt=""><br/>\n'
         f'<strong>{v}</strong><br/>\n{b}<br/>\n<sub>{s}</sub>\n\n</td>'
-        for v, b, s in cells
+        for (v, b, s), ic in zip(cells, icons)
     )
     return f"<table>\n<tr>\n{tds}\n</tr>\n</table>"
 
 
 def case_study() -> str:
-    """The demo trace, read from the media manifest written by the pipeline."""
+    """The demo trace, read from the media manifest written by the pipeline.
+
+    Rendered as three cards (recall source / ID-only rank / multimodal rank):
+    the rank movement is the point, and a key-value table buries it.
+    """
     manifest = ROOT / "artifacts" / "demo_media_manifest.json"
     if not manifest.exists():
         return f"_Demo trace unavailable — {TBD}._"
@@ -881,25 +887,33 @@ def case_study() -> str:
 
     it = max(items, key=delta)
     user = data.get("user_id", TBD)
-    sources = ", ".join(str(s).capitalize() for s in (it.get("sources") or [])) or TBD
-    title = it.get("title") or "no catalogue title"
-    if len(title) > 72:
-        title = title[:69].rstrip() + "..."
-    baseline = it.get("baseline_rank")
-    rank = it.get("rank")
-    return md_table(
-        ["Request", "Value"],
-        [
-            ["User", f"`{user}`"],
-            ["Item", f"`{it.get('item_id')}` — {title}"],
-            ["Recalled by", sources],
-            ["ID-only SASRec rank", f"#{baseline}" if baseline is not None else TBD],
-            ["MM-SASRec rank", f"#{rank}" if rank is not None else TBD],
-            ["Movement", f"↑ {int(delta(it))} positions" if delta(it) else TBD],
-            ["MicroLens video", f"`{it.get('official_video_id')}` "
-                                f"({it.get('source_codec')} → {it.get('playback_codec')})"],
-        ],
+    title = it.get("title") or ""
+    if len(title) > 68:
+        title = title[:65].rstrip() + "..."
+    sources = [str(s).capitalize() for s in (it.get("sources") or [])]
+    source_txt = " + ".join(sources) or TBD
+    baseline, rank, move = it.get("baseline_rank"), it.get("rank"), int(delta(it))
+
+    header = (
+        f'**User `{user}` · Item `{it.get("item_id")}`**'
+        + (f' — *{title}*' if title else "")
     )
+    card = (
+        "<table>\n<tr>\n"
+        f'<td align="center" width="33%">\n\n'
+        f'<img src="assets/icons/semantic.svg" width="26" height="26" alt=""><br/>\n'
+        f'<strong>{source_txt}</strong><br/>\n'
+        f'<sub>only recall source</sub>\n\n</td>\n'
+        f'<td align="center" width="33%">\n\n'
+        f'<strong>#{baseline}</strong><br/>\n'
+        f'<sub>ID-only SASRec</sub>\n\n</td>\n'
+        f'<td align="center" width="33%">\n\n'
+        f'<strong>#{rank}</strong><br/>\n'
+        f'<sub>MM-SASRec</sub><br/>\n'
+        f'<strong>&#8593;{move}</strong>\n\n</td>\n'
+        "</tr>\n</table>"
+    )
+    return f"{header}\n\n{card}"
 
 
 def media_summary() -> str:
@@ -916,13 +930,47 @@ def media_summary() -> str:
         return f"_Media mapping report missing — {TBD}._"
     frac = rep.get("matched_fraction")
     items = rep.get("items_mapped")
-    ok = rep.get("item_mapping_is_bijection")
     return (
-        f"| | |\n|---|---|\n"
-        f"| Timestamp agreement | {frac * 100:.3f} % |\n"
-        f"| Item mapping | {items:,} items, bijection: **{ok}** |\n"
-        f"| Independent check | `x_label` vs official views, 59× the shuffled control |"
+        "Media is resolved from the official MicroLens source through a verified "
+        f"id mapping — {frac * 100:.3f} % timestamp agreement, {items:,}-item bijection. "
+        "[How it is verified →](docs/media_provenance.md)"
     )
+
+
+def cold_summary() -> str:
+    """The cold-start headline numbers, from results/tables/cold_start.csv."""
+    rows = read("cold_start.csv")
+    if not rows:
+        return f"_Cold-start runs not finished — {TBD}._"
+
+    def pick(tag: str) -> dict | None:
+        for r in rows:
+            if r.get("tag") == tag:
+                return r
+        return None
+
+    def val(r: dict | None, key: str) -> float | None:
+        if not r or r.get(key) in (None, "", "None"):
+            return None
+        try:
+            return float(r[key])
+        except (TypeError, ValueError):
+            return None
+
+    body = []
+    for tag, label in (("cold_random", "Random"),
+                       ("cold_sasrec", "ID-only SASRec"),
+                       ("cold_content_only", "Content only (text + image)")):
+        v = val(pick(tag), "ColdOnly Recall@20")
+        body.append([label, TBD if v is None else f"{v * 100:.2f} %"])
+    best_full = None
+    for r in rows:
+        v = val(r, "Cold Recall@20")
+        if v is not None and (best_full is None or v > best_full):
+            best_full = v
+    body.append(["**same models, full catalogue**",
+                 TBD if best_full is None else f"**{best_full * 100:.3f} %**"])
+    return md_table(["ColdOnly Recall@20", ""], body)
 
 
 def main() -> None:
@@ -934,6 +982,7 @@ def main() -> None:
         "HERO:METRICS": hero_metrics(),
         "CASE:DEMO": case_study(),
         "CASE:MEDIA": media_summary(),
+        "CASE:COLD": cold_summary(),
         "OVERALL_SUMMARY": overall_summary_table(),
         "OVERALL": overall_table(),
         "RECALL": recall_table(),

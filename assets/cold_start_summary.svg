@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 820 356" width="820" height="356" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" role="img" aria-label="Cold-start recall by model">
+  <rect width="820" height="356" fill="#FFFFFF"/>
+  <text x="32" y="34" text-anchor="start" font-size="11" font-weight="700" fill="#6B7280" letter-spacing="0.08em">COLD-ONLY RANKING · RECALL@20</text>
+  <text x="32" y="56" font-size="12" fill="#6B7280">ranking restricted to the cold catalogue, for users whose next item is cold</text>
+  <text x="32" y="106" font-size="13" fill="#111827">Random</text>
+  <rect x="260" y="92" width="430" height="18" rx="3" fill="#F8FAFC"/>
+  <rect x="260" y="92" width="38" height="18" rx="3" fill="#9CA3AF"/>
+  <text x="704" y="106" font-size="13" font-weight="600" fill="#111827">0.97%</text>
+  <text x="32" y="140" font-size="13" fill="#111827">ID-only SASRec</text>
+  <rect x="260" y="126" width="430" height="18" rx="3" fill="#F8FAFC"/>
+  <rect x="260" y="126" width="2" height="18" rx="3" fill="#9CA3AF"/>
+  <text x="704" y="140" font-size="13" font-weight="600" fill="#111827">0.00%</text>
+  <text x="32" y="174" font-size="13" fill="#111827">Content only (text + image)</text>
+  <rect x="260" y="160" width="430" height="18" rx="3" fill="#F8FAFC"/>
+  <rect x="260" y="160" width="430" height="18" rx="3" fill="#2563EB"/>
+  <text x="704" y="174" font-size="13" font-weight="600" fill="#111827">10.92%</text>
+  <text x="32" y="208" font-size="13" fill="#111827">MM-SASRec Gated</text>
+  <rect x="260" y="194" width="430" height="18" rx="3" fill="#F8FAFC"/>
+  <rect x="260" y="194" width="386" height="18" rx="3" fill="#2563EB"/>
+  <text x="704" y="208" font-size="13" font-weight="600" fill="#111827">9.83%</text>
+  <line x1="32" y1="248" x2="788" y2="248" stroke="#E5E7EB" stroke-width="1"/>
+  <text x="32" y="278" text-anchor="start" font-size="11" font-weight="700" fill="#6B7280" letter-spacing="0.08em">BUT: SAME MODELS, FULL CATALOGUE</text>
+  <text x="32" y="300" font-size="12" fill="#6B7280">content ranks cold items well against each other, not against warm items</text>
+  <text x="32" y="326" font-size="13" fill="#111827">best full-catalogue cold Recall@20</text>
+  <text x="704" y="326" text-anchor="end" font-size="13" font-weight="600" fill="#6B7280">0.157%</text>
+</svg>

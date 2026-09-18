@@ -38,6 +38,16 @@ jobs:
         # the README is generated; a hand-edited number fails here
         run: python analysis/update_readme.py --check
 
+      - name: README assets, links and anchors resolve
+        run: python analysis/check_readme_assets.py
+
+      - name: README vector assets are up to date
+        # the cold-start figure is generated from results/tables/cold_start.csv;
+        # a stale committed SVG fails here
+        run: |
+          python analysis/generate_readme_visuals.py
+          git diff --exit-code -- assets/icons assets/system_architecture.svg assets/cold_start_summary.svg
+
   frontend:
     runs-on: ubuntu-latest
     defaults:
