@@ -14,6 +14,8 @@ export default function WatchFeed() {
   const [params] = useSearchParams();
   const userId = Number(params.get("user") ?? 68317);
   const ranker = params.get("ranker") ?? "mm_concat";
+  // deep link to one recommendation: /watch?user=68317&item=16981
+  const startItem = params.get("item") ? Number(params.get("item")) : null;
 
   const [manifest, setManifest] = useState<MediaManifest | null>(null);
   const [feed, setFeed] = useState<MediaItem[]>([]);
@@ -26,12 +28,21 @@ export default function WatchFeed() {
 
   useEffect(() => {
     api.mediaManifest().then(setManifest).catch(setError);
-    api.feed(userId).then((f) => setFeed(f.items)).catch(setError);
+    api
+      .feed(userId)
+      .then((f) => {
+        setFeed(f.items);
+        if (startItem !== null) {
+          const i = f.items.findIndex((it) => it.item_id === startItem);
+          if (i >= 0) setIndex(i);
+        }
+      })
+      .catch(setError);
     api
       .inspect(userId, { ranker, compare: "sasrec", recall_k: 200, top_n: 60 })
       .then(setTrace)
       .catch(() => undefined); // the trace is optional; the feed still plays
-  }, [userId, ranker]);
+  }, [userId, ranker, startItem]);
 
   const current = feed[index] ?? null;
 

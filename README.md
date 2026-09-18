@@ -93,7 +93,7 @@ recommendation trace the Inspector shows overlaid on each item.
 
 ![ShortRec video feed](assets/feed_playback_demo.gif)
 
-<p align="center"><em>Playable feed — real MicroLens videos for the recommended items, swipe/Next, and "Why this video?" showing recall source, baseline rank and multimodal rank movement.</em></p>
+<p align="center"><em>Playable feed — 20 recommended items as real MicroLens videos, swipe/Next through them, and "Why this video?" showing recall source, baseline rank and multimodal rank movement. The clip opens on item 16981: recalled only by the semantic channel, ranked #579 by the ID-only model and #19 by MM-SASRec.</em></p>
 
 Videos are resolved from the **official MicroLens media source** through a
 verified id mapping, and the overlay is generated from the live
@@ -221,7 +221,9 @@ python scripts/prepare_media_demo.py --fetch-official
 bash scripts/start_demo.sh          # API :8000 + UI :5173
 ```
 
-`/watch` needs step 5; everything else works without it.
+`/watch` needs step 5; everything else works without it. It accepts
+`/watch?user=68317&item=16981` to deep-link to one recommendation, and
+`--top-k` controls how many items are downloaded (`20` by default in the demo).
 
 Open <http://127.0.0.1:5173>. **A fresh clone needs trained checkpoints** — step 3
 is required, the demo is not one command from zero.

@@ -37,9 +37,9 @@
   },
   "user_id": 68317,
   "ranker": "mm_concat",
-  "top_k": 8,
-  "num_items": 8,
-  "num_available": 8,
+  "top_k": 20,
+  "num_items": 20,
+  "num_available": 20,
   "num_unavailable": 0,
   "items": {
     "18110": {
@@ -289,6 +289,380 @@
       "local_path": "data/demo_media/1133.mp4",
       "bytes": 1241286,
       "sha256": "284e911bfad31575"
+    },
+    "11773": {
+      "item_id": 11773,
+      "official_video_id": 2648,
+      "rank": 9,
+      "title": "clearly long a sound crazy face",
+      "sources": [
+        "itemcf"
+      ],
+      "recall_rank": {
+        "itemcf": 102
+      },
+      "mm_rank": 9,
+      "baseline_rank": 170,
+      "rank_delta": 161,
+      "popularity_bucket": "tail",
+      "train_interactions": 7,
+      "is_zero_train_signal": false,
+      "available": true,
+      "verified": true,
+      "likes": 18000,
+      "views": 275201,
+      "source_codec": "hevc",
+      "source_bytes": 26451075,
+      "playback_codec": "h264",
+      "playback_duration_s": 15.015,
+      "clip_seconds": 15.0,
+      "note": "transcoded from the original HEVC to H.264 for browser playback; the clip is the first 15s of the source video",
+      "local_path": "data/demo_media/2648.mp4",
+      "bytes": 4847108,
+      "sha256": "568133a13fb585fc"
+    },
+    "16957": {
+      "item_id": 16957,
+      "official_video_id": 5416,
+      "rank": 10,
+      "title": "with a song of time",
+      "sources": [
+        "itemcf"
+      ],
+      "recall_rank": {
+        "itemcf": 97
+      },
+      "mm_rank": 10,
+      "baseline_rank": 323,
+      "rank_delta": 313,
+      "popularity_bucket": "tail",
+      "train_interactions": 6,
+      "is_zero_train_signal": false,
+      "available": true,
+      "verified": true,
+      "likes": 13000,
+      "views": 207921,
+      "source_codec": "hevc",
+      "source_bytes": 10266891,
+      "playback_codec": "h264",
+      "playback_duration_s": 15.0,
+      "clip_seconds": 15.0,
+      "note": "transcoded from the original HEVC to H.264 for browser playback; the clip is the first 15s of the source video",
+      "local_path": "data/demo_media/5416.mp4",
+      "bytes": 1159341,
+      "sha256": "2a983bd2733ff3a5"
+    },
+    "18366": {
+      "item_id": 18366,
+      "official_video_id": 13763,
+      "rank": 11,
+      "title": "life is not easy Bald strong went to deliver food # beardboonie",
+      "sources": [
+        "semantic"
+      ],
+      "recall_rank": {
+        "semantic": 185
+      },
+      "mm_rank": 11,
+      "baseline_rank": 384,
+      "rank_delta": 373,
+      "popularity_bucket": "tail",
+      "train_interactions": 3,
+      "is_zero_train_signal": false,
+      "available": true,
+      "verified": true,
+      "likes": 12000,
+      "views": 566031,
+      "source_codec": "hevc",
+      "source_bytes": 19889892,
+      "playback_codec": "h264",
+      "playback_duration_s": 15.0,
+      "clip_seconds": 15.0,
+      "note": "transcoded from the original HEVC to H.264 for browser playback; the clip is the first 15s of the source video",
+      "local_path": "data/demo_media/13763.mp4",
+      "bytes": 800258,
+      "sha256": "cbe8563d4ebe10c0"
+    },
+    "18459": {
+      "item_id": 18459,
+      "official_video_id": 12909,
+      "rank": 12,
+      "title": "# Salute to the hero of the War of Resistance # half-life snow student edition # Love me China strong our country",
+      "sources": [
+        "semantic"
+      ],
+      "recall_rank": {
+        "semantic": 3
+      },
+      "mm_rank": 12,
+      "baseline_rank": 527,
+      "rank_delta": 515,
+      "popularity_bucket": "tail",
+      "train_interactions": 2,
+      "is_zero_train_signal": false,
+      "available": true,
+      "verified": true,
+      "likes": 14000,
+      "views": 249000,
+      "source_codec": "hevc",
+      "source_bytes": 6965253,
+      "playback_codec": "h264",
+      "playback_duration_s": 15.0,
+      "clip_seconds": 15.0,
+      "note": "transcoded from the original HEVC to H.264 for browser playback; the clip is the first 15s of the source video",
+      "local_path": "data/demo_media/12909.mp4",
+      "bytes": 5422173,
+      "sha256": "ffc5c26d7b3a9c1e"
+    },
+    "17077": {
+      "item_id": 17077,
+      "official_video_id": 5048,
+      "rank": 13,
+      "title": "a string of eight bottles ~ secretly fascinated with revision # funny # sand sculpture # funny cover",
+      "sources": [
+        "itemcf"
+      ],
+      "recall_rank": {
+        "itemcf": 44
+      },
+      "mm_rank": 13,
+      "baseline_rank": 283,
+      "rank_delta": 270,
+      "popularity_bucket": "tail",
+      "train_interactions": 3,
+      "is_zero_train_signal": false,
+      "available": true,
+      "verified": true,
+      "likes": 10000,
+      "views": 420000,
+      "source_codec": "hevc",
+      "source_bytes": 4905456,
+      "playback_codec": "h264",
+      "playback_duration_s": 15.0,
+      "clip_seconds": 15.0,
+      "note": "transcoded from the original HEVC to H.264 for browser playback; the clip is the first 15s of the source video",
+      "local_path": "data/demo_media/5048.mp4",
+      "bytes": 575966,
+      "sha256": "a93e4234daf29b7a"
+    },
+    "11360": {
+      "item_id": 11360,
+      "official_video_id": 5868,
+      "rank": 14,
+      "title": "# creative inspiration # fire # Saving hero Shenzhen guy has twice rushed into the fire",
+      "sources": [
+        "itemcf"
+      ],
+      "recall_rank": {
+        "itemcf": 19
+      },
+      "mm_rank": 14,
+      "baseline_rank": 70,
+      "rank_delta": 56,
+      "popularity_bucket": "tail",
+      "train_interactions": 17,
+      "is_zero_train_signal": false,
+      "available": true,
+      "verified": true,
+      "likes": 10000,
+      "views": 111159,
+      "source_codec": "hevc",
+      "source_bytes": 10680568,
+      "playback_codec": "h264",
+      "playback_duration_s": 15.0,
+      "clip_seconds": 15.0,
+      "note": "transcoded from the original HEVC to H.264 for browser playback; the clip is the first 15s of the source video",
+      "local_path": "data/demo_media/5868.mp4",
+      "bytes": 3285781,
+      "sha256": "bcba597cbe43ab69"
+    },
+    "17980": {
+      "item_id": 17980,
+      "official_video_id": 18358,
+      "rank": 15,
+      "title": "why... Must be done by one person alone... ? # Refueling season # Fast Hands film and television hot plan # Assemble photosynthetic creators",
+      "sources": [
+        "itemcf"
+      ],
+      "recall_rank": {
+        "itemcf": 124
+      },
+      "mm_rank": 15,
+      "baseline_rank": 235,
+      "rank_delta": 220,
+      "popularity_bucket": "tail",
+      "train_interactions": 8,
+      "is_zero_train_signal": false,
+      "available": true,
+      "verified": true,
+      "likes": 166000,
+      "views": 14245542,
+      "source_codec": "hevc",
+      "source_bytes": 69711905,
+      "playback_codec": "h264",
+      "playback_duration_s": 15.0,
+      "clip_seconds": 15.0,
+      "note": "transcoded from the original HEVC to H.264 for browser playback; the clip is the first 15s of the source video",
+      "local_path": "data/demo_media/18358.mp4",
+      "bytes": 3314911,
+      "sha256": "7fd13173dd7deb6a"
+    },
+    "16509": {
+      "item_id": 16509,
+      "official_video_id": 17602,
+      "rank": 16,
+      "title": "this is I heard",
+      "sources": [
+        "itemcf"
+      ],
+      "recall_rank": {
+        "itemcf": 38
+      },
+      "mm_rank": 16,
+      "baseline_rank": 53,
+      "rank_delta": 37,
+      "popularity_bucket": "tail",
+      "train_interactions": 6,
+      "is_zero_train_signal": false,
+      "available": true,
+      "verified": true,
+      "likes": 42000,
+      "views": 466000,
+      "source_codec": "hevc",
+      "source_bytes": 1781190,
+      "playback_codec": "h264",
+      "playback_duration_s": 11.833333,
+      "clip_seconds": 15.0,
+      "note": "transcoded from the original HEVC to H.264 for browser playback; the clip is the first 15s of the source video",
+      "local_path": "data/demo_media/17602.mp4",
+      "bytes": 1796464,
+      "sha256": "e0532a2bd71ed7df"
+    },
+    "18410": {
+      "item_id": 18410,
+      "official_video_id": 2415,
+      "rank": 17,
+      "title": "西班牙莱昂诺尔公主，在她8岁的时候，国王父亲就向全世界宣布，无论将来会不会有王子出生，#莱昂诺尔公主 都是西班牙王位唯一继承人 #颜值 #颜兮阁",
+      "sources": [
+        "itemcf"
+      ],
+      "recall_rank": {
+        "itemcf": 67
+      },
+      "mm_rank": 17,
+      "baseline_rank": 405,
+      "rank_delta": 388,
+      "popularity_bucket": "tail",
+      "train_interactions": 5,
+      "is_zero_train_signal": false,
+      "available": true,
+      "verified": true,
+      "likes": 83000,
+      "views": 2825000,
+      "source_codec": "hevc",
+      "source_bytes": 1518101,
+      "playback_codec": "h264",
+      "playback_duration_s": 15.0,
+      "clip_seconds": 15.0,
+      "note": "transcoded from the original HEVC to H.264 for browser playback; the clip is the first 15s of the source video",
+      "local_path": "data/demo_media/2415.mp4",
+      "bytes": 1542852,
+      "sha256": "027ea3179556a304"
+    },
+    "14404": {
+      "item_id": 14404,
+      "official_video_id": 7503,
+      "rank": 18,
+      "title": "# Photosynthetic Creators Conference 2022 Wish you safe return every time # SalutoFiremen # Fellow bystanders Team",
+      "sources": [
+        "itemcf",
+        "semantic"
+      ],
+      "recall_rank": {
+        "itemcf": 15,
+        "semantic": 160
+      },
+      "mm_rank": 18,
+      "baseline_rank": 246,
+      "rank_delta": 228,
+      "popularity_bucket": "tail",
+      "train_interactions": 16,
+      "is_zero_train_signal": false,
+      "available": true,
+      "verified": true,
+      "likes": 56000,
+      "views": 1252000,
+      "source_codec": "hevc",
+      "source_bytes": 3003719,
+      "playback_codec": "h264",
+      "playback_duration_s": 15.0,
+      "clip_seconds": 15.0,
+      "note": "transcoded from the original HEVC to H.264 for browser playback; the clip is the first 15s of the source video",
+      "local_path": "data/demo_media/7503.mp4",
+      "bytes": 2405532,
+      "sha256": "bc571606ab20837a"
+    },
+    "16981": {
+      "item_id": 16981,
+      "official_video_id": 19695,
+      "rank": 19,
+      "title": "# Love me China strong China Wei # Salute to the Chinese people's Army # salute to the Chinese military How only foreigners love to sing this song",
+      "sources": [
+        "semantic"
+      ],
+      "recall_rank": {
+        "semantic": 6
+      },
+      "mm_rank": 19,
+      "baseline_rank": 579,
+      "rank_delta": 560,
+      "popularity_bucket": "tail",
+      "train_interactions": 6,
+      "is_zero_train_signal": false,
+      "available": true,
+      "verified": true,
+      "likes": 27000,
+      "views": 202000,
+      "source_codec": "hevc",
+      "source_bytes": 8994134,
+      "playback_codec": "h264",
+      "playback_duration_s": 15.0,
+      "clip_seconds": 15.0,
+      "note": "transcoded from the original HEVC to H.264 for browser playback; the clip is the first 15s of the source video",
+      "local_path": "data/demo_media/19695.mp4",
+      "bytes": 3618113,
+      "sha256": "8653518c8628d564"
+    },
+    "18899": {
+      "item_id": 18899,
+      "official_video_id": 13102,
+      "rank": 20,
+      "title": "Count 5 sad and beautiful songs",
+      "sources": [
+        "itemcf"
+      ],
+      "recall_rank": {
+        "itemcf": 89
+      },
+      "mm_rank": 20,
+      "baseline_rank": 104,
+      "rank_delta": 84,
+      "popularity_bucket": "tail",
+      "train_interactions": 6,
+      "is_zero_train_signal": false,
+      "available": true,
+      "verified": true,
+      "likes": 210000,
+      "views": 2208000,
+      "source_codec": "hevc",
+      "source_bytes": 21144193,
+      "playback_codec": "h264",
+      "playback_duration_s": 15.0,
+      "clip_seconds": 15.0,
+      "note": "transcoded from the original HEVC to H.264 for browser playback; the clip is the first 15s of the source video",
+      "local_path": "data/demo_media/13102.mp4",
+      "bytes": 1472944,
+      "sha256": "96cd6c3148274ae0"
     }
   },
   "playback": {

@@ -51,6 +51,10 @@ def main() -> None:
     ap.add_argument("--base-url", default="http://127.0.0.1:5173")
     ap.add_argument("--out", default="assets/feed_playback_demo.gif")
     ap.add_argument("--user-id", type=int, default=None)
+    ap.add_argument("--start-item", type=int, default=None,
+                    help="deep-link the feed to this recommended item")
+    ap.add_argument("--swipes", type=int, default=4,
+                    help="how many recommendations to swipe through")
     ap.add_argument("--width", type=int, default=1200)
     ap.add_argument("--height", type=int, default=760)
     ap.add_argument("--max-mb", type=float, default=8.0)
@@ -74,8 +78,10 @@ def main() -> None:
         browser = p.chromium.launch()
         page = browser.new_page(viewport={"width": args.width, "height": args.height},
                                 device_scale_factor=1)
-        page.goto(f"{args.base_url.rstrip('/')}/watch?user={user_id}",
-                  wait_until="networkidle", timeout=180_000)
+        url = f"{args.base_url.rstrip('/')}/watch?user={user_id}"
+        if args.start_item is not None:
+            url += f"&item={args.start_item}"
+        page.goto(url, wait_until="networkidle", timeout=180_000)
         # let the first video actually start painting frames
         page.wait_for_timeout(4000)
         state = page.evaluate("""() => { const v=document.querySelector('video');
@@ -95,30 +101,31 @@ def main() -> None:
             captures.append((img, time.time() - t0))
 
         # 1. the feed playing
-        for _ in range(12):
-            frame()
-            page.wait_for_timeout(320)
-
-        # 2. open the recommendation trace
-        page.get_by_role("button", name="Why this video?").click()
-        page.wait_for_timeout(700)
         for _ in range(10):
             frame()
             page.wait_for_timeout(320)
 
-        # 3. close and swipe to the next recommendation
-        page.get_by_role("button", name="Hide trace").click()
-        page.wait_for_timeout(400)
-        page.get_by_role("button", name="Next ↓").click()
-        page.wait_for_timeout(1200)
-        for _ in range(12):
-            frame()
-            page.wait_for_timeout(320)
-
-        # 4. the second item's trace, to show a different recall source / movement
+        # 2. open the recommendation trace on the first item
         page.get_by_role("button", name="Why this video?").click()
         page.wait_for_timeout(700)
-        for _ in range(8):
+        for _ in range(9):
+            frame()
+            page.wait_for_timeout(320)
+        page.get_by_role("button", name="Hide trace").click()
+        page.wait_for_timeout(400)
+
+        # 3. swipe through several recommendations so the feed reads as a feed
+        for _ in range(max(args.swipes, 0)):
+            page.get_by_role("button", name="Next ↓").click()
+            page.wait_for_timeout(1100)
+            for _ in range(5):
+                frame()
+                page.wait_for_timeout(300)
+
+        # 4. open the trace again on the item we landed on
+        page.get_by_role("button", name="Why this video?").click()
+        page.wait_for_timeout(700)
+        for _ in range(9):
             frame()
             page.wait_for_timeout(320)
 
