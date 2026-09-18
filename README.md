@@ -85,6 +85,50 @@ cold start: content separates cold items from each other, but their scores are
 still not calibrated against warm items in a shared ranking. Both halves of that
 sentence are measured results — see the Cold-start section.
 
+## Product view
+
+The recommendation pipeline ultimately serves a ranked short-video feed. This is
+that feed: the served top-K rendered as playable videos, with the same
+recommendation trace the Inspector shows overlaid on each item.
+
+![ShortRec video feed](assets/feed_playback_demo.gif)
+
+<p align="center"><em>Playable feed — real MicroLens videos for the recommended items, swipe/Next, and "Why this video?" showing recall source, baseline rank and multimodal rank movement.</em></p>
+
+Videos are resolved from the **official MicroLens media source** through a
+verified id mapping, and the overlay is generated from the live
+`/users/{u}/inspect` response — recall source, baseline rank, multimodal rank and
+popularity metadata are not mocked.
+
+### How the media is matched to a recommendation
+
+The modelling dataset is the HuggingFace re-upload `sisuo/Microlens_100k`, which
+**re-indexed both users and items** — its `itemID` is not the official MicroLens
+`videoID`. Binding a video by assuming `item_id == filename` would be wrong.
+
+`scripts/prepare_media_demo.py` therefore recovers the permutation from the
+official `MicroLens-100k_pairs.csv` by joining on the **exact millisecond
+timestamp**, and `scripts/verify_media_mapping.py` checks it:
+
+| check | result |
+|---|---|
+| exact millisecond timestamp matches | 719 299 / 719 405 (99.985 %) |
+| item mapping is a bijection | 19 738 HF items → 19 738 distinct video ids, zero collisions |
+| user mapping is a bijection | 100 000 HF users → 100 000 distinct official users |
+| independent check: mean `x_label` vs official views | correlation 59× the shuffled control |
+
+Video files in the official archive are `MicroLens-100k_videos/<videoID>.mp4`, so
+the recovered id is directly the filename. Only the needed videos are fetched,
+by HTTP range request against the split archive (the index alone is ~2 MB rather
+than 477 GB for the whole archive).
+
+> **Playback media is a local artefact.** The official videos are HEVC/H.265,
+> which browsers cannot decode, so `scripts/prepare_media_demo.py` transcodes the
+> first 15 s of each needed video to H.264 and stores it under `data/demo_media/`.
+> That directory is **not** in git: the media is downloaded from the official
+> source and is not redistributed here. The ranking model itself uses ID + text +
+> image features, **not** the video stream.
+
 ## Demo
 
 ![Recommendation Inspector](assets/inspector_demo.png)
@@ -100,6 +144,7 @@ The demo has four pages:
 | route | page | answers |
 |---|---|---|
 | `/` | Live Demo | what does the system do with this user's history? |
+| `/watch` | Feed View | what does the user actually see? |
 | `/inspect` | Recommendation Inspector | why is *this* item recommended? |
 | `/cold` | Cold Start Explorer | why do new videos need content features? |
 | `/system` | System | is this a real system or a model demo? |
@@ -169,9 +214,14 @@ python scripts/train.py --config configs/mm_sasrec_concat.yaml
 # 4. build the recall indices
 python scripts/prepare_demo.py
 
-# 5. run the demo
+# 5. (optional) download + transcode the demo videos for the playable feed
+python scripts/prepare_media_demo.py --fetch-official
+
+# 6. run the demo
 bash scripts/start_demo.sh          # API :8000 + UI :5173
 ```
+
+`/watch` needs step 5; everything else works without it.
 
 Open <http://127.0.0.1:5173>. **A fresh clone needs trained checkpoints** — step 3
 is required, the demo is not one command from zero.
@@ -522,6 +572,9 @@ GET /users/{u}/recommend         the served top-K
 GET /users/{u}/inspect           full request trace (Inspector page)
 GET /cold/summary                cold-start experiment results
 GET /cold/items[/{id}]           cold items + content availability
+GET /media/manifest              prepared demo media + the id-mapping evidence
+GET /media/video/{item_id}       the prepared mp4 (integer id, manifest lookup only)
+GET /feed                        playable feed in recommendation order
 POST /recommend                  legacy history-based endpoint
 ```
 

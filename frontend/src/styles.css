@@ -378,3 +378,83 @@ details.dev pre {
   background: var(--bg); border: 1px solid var(--border); border-radius: 6px;
   padding: 12px; overflow-x: auto; font-size: 12px; line-height: 1.55; margin-top: 8px;
 }
+
+/* ============================================================
+   Feed View — playable short-video feed
+   ============================================================ */
+.watch {
+  display: grid;
+  grid-template-columns: minmax(320px, 420px) 1fr;
+  gap: 18px;
+  align-items: start;
+}
+@media (max-width: 900px) { .watch { grid-template-columns: 1fr; } }
+
+.stage { display: flex; flex-direction: column; gap: 10px; }
+
+.player {
+  width: 100%;
+  aspect-ratio: 9 / 16;
+  max-height: 620px;
+  background: #101317;
+  border-radius: 10px;
+  object-fit: contain;
+  display: block;
+  cursor: pointer;
+}
+.player.unavailable {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #c9d1d9;
+  text-align: center;
+  border: 1px dashed #3a4048;
+}
+.stage-bar { display: flex; align-items: center; gap: 10px; }
+.stage-bar .small { flex: 1; text-align: center; }
+
+.why {
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--panel);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.why .card-head { display: flex; align-items: center; justify-content: space-between; }
+.why .rank { font-size: 12px; font-weight: 700; color: var(--accent); }
+.why .iid { font-family: var(--mono); font-size: 19px; font-weight: 650; }
+.why .title { font-size: 14px; color: var(--text); margin-top: -4px; }
+.why .rows { display: flex; flex-direction: column; gap: 5px; }
+.why .r { display: flex; justify-content: space-between; gap: 12px; font-size: 12.5px; }
+.why .r .k { color: var(--text-muted); white-space: nowrap; }
+.why .r .v { font-variant-numeric: tabular-nums; text-align: right; }
+
+.why-btn {
+  align-self: flex-start;
+  border-color: var(--accent);
+  color: var(--accent);
+  font-weight: 560;
+}
+.trace-panel {
+  border-top: 1px dashed var(--border);
+  padding-top: 12px;
+  margin-top: 4px;
+}
+.modalities {
+  border-top: 1px dashed var(--border);
+  padding-top: 12px;
+  margin-top: 6px;
+}
+
+a.feed-cta {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--accent);
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  padding: 5px 12px;
+  text-decoration: none;
+}
+a.feed-cta:hover { background: var(--accent-soft); text-decoration: none; }

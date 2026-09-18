@@ -55,6 +55,7 @@ _STATS: dict[str, Any] = {"requests": 0, "total_ms": 0.0}
 
 
 def get_service() -> ShortRecService:
+    """Module-level accessor, used by scripts and the CLI entry point."""
     if _SERVICE is None:
         raise RuntimeError("service not loaded")
     return _SERVICE
@@ -66,7 +67,7 @@ def load(**kwargs) -> ShortRecService:
     return _SERVICE
 
 
-def create_app(**service_kwargs):
+def create_app(service: ShortRecService | None = None, **service_kwargs):
     configure_threads()
     from fastapi import FastAPI, HTTPException, Query
     from fastapi.middleware.cors import CORSMiddleware
@@ -74,8 +75,10 @@ def create_app(**service_kwargs):
     from .schemas import (
         ColdItemOut,
         ColdSummaryResponse,
+        FeedResponse,
         LegacyRecommendRequest,
         LegacyRecommendResponse,
+        MediaManifestResponse,
         RecallResponse,
         RecommendResponse,
         SystemResponse,
@@ -94,10 +97,18 @@ def create_app(**service_kwargs):
         allow_headers=["*"],
     )
 
+    # The service is held per app instance, not in a module global: two apps in
+    # one process (tests, or a base + cold deployment) must not share it.
+    _holder: dict[str, ShortRecService | None] = {"service": service}
+
+    def svc() -> ShortRecService:
+        if _holder["service"] is None:
+            _holder["service"] = load(**service_kwargs)
+        return _holder["service"]
+
     @app.on_event("startup")
     def _startup() -> None:  # pragma: no cover - requires fastapi
-        if _SERVICE is None:
-            load(**service_kwargs)
+        svc()
 
     def _timed(fn, *a, **kw):
         t0 = time.perf_counter()
@@ -119,22 +130,53 @@ def create_app(**service_kwargs):
 
     @app.get("/system", response_model=SystemResponse)
     def system() -> dict:
-        return _timed(get_service().system)
+        return _timed(svc().system)
 
     @app.get("/models")
     def models() -> dict:
-        return {"models": get_service().model_infos()}
+        return {"models": svc().model_infos()}
 
     @app.get("/evaluation")
     def evaluation() -> dict:
         """Offline recall / pipeline / latency artifacts for the System page."""
-        return get_service().evaluation()
+        return svc().evaluation()
+
+    # ------------------------------------------------------------------
+    # demo media: real MicroLens videos resolved by verified item id mapping
+    # ------------------------------------------------------------------
+    @app.get("/media/manifest", response_model=MediaManifestResponse)
+    def media_manifest() -> dict:
+        """What media is prepared, and the evidence that the id mapping is correct."""
+        return svc().media_manifest()
+
+    @app.get("/feed", response_model=FeedResponse)
+    def feed(user_id: int | None = Query(None)) -> dict:
+        """Playable feed in recommendation order (only items with verified media)."""
+        return svc().feed(user_id)
+
+    @app.get("/items/{item_id}/media")
+    def item_media(item_id: int) -> dict:
+        return svc().item_media(item_id)
+
+    @app.get("/media/video/{item_id}")
+    def media_video(item_id: int):
+        """Serve one prepared mp4.
+
+        ``item_id`` is an integer path parameter and the file path comes from the
+        manifest lookup only, so a crafted id cannot escape the media directory.
+        """
+        from fastapi.responses import FileResponse
+
+        path = svc().media_video_path(int(item_id))
+        if path is None:
+            raise HTTPException(status_code=404, detail=f"no prepared media for item {item_id}")
+        return FileResponse(path, media_type="video/mp4")
 
     # ------------------------------------------------------------------
     @app.get("/users/{user_id}", response_model=UserResponse)
     def user(user_id: int) -> dict:
         try:
-            return _timed(get_service().user, user_id)
+            return _timed(svc().user, user_id)
         except IndexError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
 
@@ -146,7 +188,7 @@ def create_app(**service_kwargs):
     ) -> dict:
         src = [s.strip() for s in sources.split(",")] if sources else None
         try:
-            return _timed(get_service().recall, user_id, top_k, src)
+            return _timed(svc().recall, user_id, top_k, src)
         except IndexError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
 
@@ -163,16 +205,16 @@ def create_app(**service_kwargs):
         cold_quota: int | None = Query(None, ge=0, le=20, deprecated=True),
         max_candidates: int | None = Query(None, ge=1, le=20000),
     ) -> dict:
-        svc = get_service()
+        service_ = svc()
         if cold_exploration is not None:
             exploration = cold_exploration
         if cold_quota is not None:
             exploration_quota = cold_quota
-        if ranker is not None and ranker not in svc.registry.names:
+        if ranker is not None and ranker not in service_.registry.names:
             raise HTTPException(status_code=400,
-                                detail=f"unknown ranker {ranker!r}; available {svc.registry.names}")
+                                detail=f"unknown ranker {ranker!r}; available {service_.registry.names}")
         try:
-            return _timed(svc.recommend, user_id, recall_k, top_k, ranker,
+            return _timed(service_.recommend, user_id, recall_k, top_k, ranker,
                           exploration, exploration_quota, max_candidates)
         except IndexError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
@@ -189,12 +231,12 @@ def create_app(**service_kwargs):
     ) -> dict:
         if cold_exploration is not None:
             exploration = cold_exploration
-        svc = get_service()
+        service_ = svc()
         for name in (ranker, compare):
-            if name is not None and name not in svc.registry.names:
+            if name is not None and name not in service_.registry.names:
                 raise HTTPException(status_code=400, detail=f"unknown ranker {name!r}")
         try:
-            return _timed(svc.inspect, user_id, recall_k, top_n, ranker,
+            return _timed(service_.inspect, user_id, recall_k, top_n, ranker,
                           compare, exploration)
         except IndexError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
@@ -202,15 +244,15 @@ def create_app(**service_kwargs):
     # ------------------------------------------------------------------
     @app.get("/cold/summary", response_model=ColdSummaryResponse)
     def cold_summary() -> dict:
-        return get_service().cold_summary()
+        return svc().cold_summary()
 
     @app.get("/cold/items", response_model=list[ColdItemOut])
     def cold_items(n: int = Query(20, ge=1, le=100), seed: int = 0) -> list[dict]:
-        return get_service().cold_items(n=n, seed=seed)
+        return svc().cold_items(n=n, seed=seed)
 
     @app.get("/cold/items/{item_id}", response_model=ColdItemOut)
     def cold_item(item_id: int) -> dict:
-        out = get_service().cold_item(item_id)
+        out = svc().cold_item(item_id)
         if out is None:
             raise HTTPException(status_code=404, detail=f"item {item_id} is not a cold item")
         return out
@@ -219,21 +261,21 @@ def create_app(**service_kwargs):
     @app.post("/recommend", response_model=LegacyRecommendResponse)
     def legacy_recommend(req: LegacyRecommendRequest) -> dict:
         """History-based endpoint kept for backwards compatibility."""
-        svc = get_service()
-        internal = [svc.to_internal(i) for i in req.history]
+        service_ = svc()
+        internal = [service_.to_internal(i) for i in req.history]
         internal = [i for i in internal if i > 0]
         t0 = time.perf_counter()
-        model = svc.registry.get(svc.default_ranker)
+        model = service_.registry.get(service_.default_ranker)
         if not internal:
             return {"items": [], "latency_ms": 0.0}
-        merged = svc.merger.recall_and_merge(
+        merged = service_.merger.recall_and_merge(
             user_id=0, history=internal, per_source_k=max(req.top_k * 10, 200),
             total_k=1000,
         )
         ids = merged.item_ids()
         scores = model.score_candidates(internal, ids) if ids else []
         order = sorted(range(len(ids)), key=lambda j: -scores[j])[: req.top_k]
-        items = [{"item_id": svc.to_raw(ids[j]), "score": float(scores[j])} for j in order]
+        items = [{"item_id": service_.to_raw(ids[j]), "score": float(scores[j])} for j in order]
         return {"items": items, "latency_ms": round((time.perf_counter() - t0) * 1000, 2)}
 
     return app

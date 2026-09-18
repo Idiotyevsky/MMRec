@@ -48,6 +48,8 @@ def main() -> None:
     ap.add_argument("--skip-itemcf", action="store_true")
     ap.add_argument("--skip-semantic", action="store_true")
     ap.add_argument("--top-m", type=int, default=100)
+    ap.add_argument("--with-media", action="store_true",
+                    help="also download demo videos from the official MicroLens source")
     args = ap.parse_args()
 
     manifest: dict = {"root": str(ROOT), "steps": {}, "ready": True}
@@ -136,6 +138,19 @@ def main() -> None:
             missing.append("content embedding build failed")
     else:
         missing.append("content embeddings missing (needs the processed dataset)")
+
+    # ---- 4b. optional demo media -------------------------------------
+    if args.with_media:
+        import subprocess
+
+        LOG.info("preparing demo media (official MicroLens videos) ...")
+        rc = subprocess.call([sys.executable, "scripts/prepare_media_demo.py"], cwd=str(ROOT))
+        manifest["steps"]["media"] = {"ok": rc == 0, "built_now": True}
+        if rc != 0:
+            missing.append("demo media preparation failed")
+    else:
+        media_manifest = ROOT / "artifacts" / "demo_media_manifest.json"
+        manifest["steps"]["media"] = {"ok": media_manifest.exists(), "skipped": not media_manifest.exists()}
 
     # ---- 5. manifest ----
     manifest["missing"] = missing

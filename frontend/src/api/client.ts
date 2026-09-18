@@ -1,5 +1,8 @@
 import type {
   ColdItem,
+  FeedResponse,
+  MediaItem,
+  MediaManifest,
   ColdSummary,
   EvaluationResponse,
   InspectResponse,
@@ -54,6 +57,9 @@ export const api = {
     } = {},
   ) => get<InspectResponse>(`/users/${id}/inspect`, opts),
   evaluation: () => get<EvaluationResponse>("/evaluation"),
+  feed: (userId?: number) => get<FeedResponse>("/feed", { user_id: userId }),
+  mediaManifest: () => get<MediaManifest>("/media/manifest"),
+  itemMedia: (itemId: number) => get<MediaItem>(`/items/${itemId}/media`),
   coldSummary: () => get<ColdSummary>("/cold/summary"),
   coldItems: (n = 12, seed = 0) => get<ColdItem[]>("/cold/items", { n, seed }),
   coldItem: (id: number) => get<ColdItem>(`/cold/items/${id}`),

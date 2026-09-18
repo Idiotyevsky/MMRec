@@ -1,6 +1,9 @@
 # ---- data (never commit raw or processed datasets) ----
 data/raw/
 data/processed/
+# demo playback media: downloaded from the official MicroLens source, never
+# redistributed here (size + licence)
+data/demo_media/
 *.inter
 *_feat.npy
 
@@ -33,6 +36,9 @@ results/legacy_pre_autoregressive_fix/*
 !artifacts/itemcf_report.json
 !artifacts/semantic_index_report.json
 !artifacts/demo_manifest.json
+!artifacts/demo_media_manifest.json
+!artifacts/item_id_mapping.json
+!artifacts/media_archive_index.json
 
 # ---- demo screenshots are small and referenced by the README ----
 !assets/*.png

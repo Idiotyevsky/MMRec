@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import { api } from "../api/client";
 import type { InspectResponse, SystemResponse, UserResponse } from "../api/types";
 import { Badge, BucketBadge, ErrorBox, Panel, Stat, fmt, num, pct } from "../components/common";
@@ -220,6 +221,11 @@ export default function LiveDemo() {
 
           <Panel
             title={`Served top-${served.length}`}
+            right={
+              <Link className="feed-cta" to={`/watch?user=${userId}&ranker=${ranker}`}>
+                View as Video Feed →
+              </Link>
+            }
             note={showMovement
               ? "SASRec → MM shows where the ID-only baseline placed the same item inside the same candidate pool. Rank movement is the honest comparison; raw scores from different models are not on a common scale."
               : undefined}

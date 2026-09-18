@@ -30,6 +30,7 @@ from ..recall import (
     load_itemcf_index,
 )
 from ..recall.semantic import build_content_embeddings
+from ..media.library import MediaLibrary
 from ..utils.logging import get_logger
 
 LOG = get_logger("mmrec.service")
@@ -111,6 +112,9 @@ class ShortRecService:
         else:
             LOG.warning(f"cold dataset missing at {cold_path}; /cold endpoints degraded")
             self.cold_metadata = None
+        # ---- demo media (optional; absence must not break serving) ----
+        self.media = MediaLibrary(root=self.root)
+
         self._cold_ids = (np.flatnonzero(self.cold_data.is_simulated_cold)
                           if self.cold_data is not None else np.zeros(0, dtype=np.int64))
         self._feature_dir = self.root / feature_dir
@@ -355,6 +359,54 @@ class ShortRecService:
                 "offline": metrics.get(key, {}) if key else {},
             })
         return infos
+
+    # ------------------------------------------------------------------
+    # demo media
+    def media_manifest(self) -> dict:
+        return self.media.manifest_summary()
+
+    def item_media(self, item_raw: int) -> dict:
+        """Media info for one item, keyed by the raw MicroLens id."""
+        raw = int(item_raw)
+        if raw not in self._raw_to_internal:
+            return {"item_id": raw, "available": False, "verified": False,
+                    "reason": "unknown item id"}
+        rec = self.media.get(raw)
+        if rec is None:
+            return {"item_id": raw, "available": False, "verified": False,
+                    "reason": "no media prepared for this item"}
+        out = rec.as_dict()
+        out["is_zero_train_signal"] = self._zero_train(raw)
+        return out
+
+    def media_video_path(self, item_raw: int):
+        """Resolve a raw item id to a prepared video file, or ``None``.
+
+        The manifest is keyed by raw MicroLens item ids, the same space the API
+        exposes, so no conversion happens here.  The caller never builds a path
+        from user input.
+        """
+        return self.media.video_path(int(item_raw))
+
+    def _zero_train(self, raw_item: int) -> bool:
+        internal = int(self._raw_to_internal.get(int(raw_item), 0))
+        if internal <= 0:
+            return False
+        return bool(self.metadata.is_zero_train_signal[internal])
+
+    def feed(self, user_id: int | None = None) -> dict:
+        """Playable feed in recommendation order, with the raw id mapping applied."""
+        entries = []
+        for rec in self.media.feed(user_id):
+            out = dict(rec)
+            out["is_zero_train_signal"] = self._zero_train(rec["item_id"])
+            entries.append(out)
+        return {
+            "user_id": user_id,
+            "num_items": len(entries),
+            "prepared": self.media.prepared,
+            "items": entries,
+        }
 
     # ------------------------------------------------------------------
     # cold start explorer

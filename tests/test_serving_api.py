@@ -35,11 +35,7 @@ def client(synthetic_dir, synthetic_recall_artifacts, synthetic_run, tmp_path_fa
         ranker_specs={"sasrec": RankerSpec("sasrec", synthetic_run, description="ID-only")},
         feature_dir=str(synthetic_dir),
     )
-    app = create_app()
-    import src.serving.app as app_module
-
-    app_module._SERVICE = service
-    with TestClient(app) as c:
+    with TestClient(create_app(service=service)) as c:
         yield c
 
 

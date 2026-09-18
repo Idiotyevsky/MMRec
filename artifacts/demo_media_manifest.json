@@ -1,0 +1,301 @@
+{
+  "source": "MicroLens official media (recsys.westlake.edu.cn)",
+  "source_url": "https://recsys.westlake.edu.cn/MicroLens-100k-Dataset/MicroLens-100k_videos.z01",
+  "media_kind": "raw mp4 playback media for the demo feed",
+  "verified_mapping": true,
+  "mapping_source": "MicroLens-100k_pairs.csv joined on exact millisecond timestamps",
+  "mapping_report": {
+    "method": "exact millisecond timestamp join",
+    "hf_interactions": 719405,
+    "official_interactions": 719405,
+    "unambiguous_timestamp_matches": 719299,
+    "matched_fraction": 0.999853,
+    "items_mapped": 19738,
+    "official_video_id_range": [
+      1,
+      19738
+    ],
+    "item_mapping_is_bijection": true,
+    "user_pairs_distinct_hf": 100000,
+    "user_mapping_is_bijection": true,
+    "sources": {
+      "hf_interactions": "data/raw/microlens_100k.inter",
+      "official_pairs": "data/raw/official/MicroLens-100k_pairs.csv"
+    }
+  },
+  "archive_index": {
+    "archive": "MicroLens-100k_videos.zip",
+    "base_url": "https://recsys.westlake.edu.cn/MicroLens-100k-Dataset",
+    "num_parts": 223,
+    "num_videos": 19738,
+    "video_id_range": [
+      1,
+      19738
+    ],
+    "total_compressed_bytes": 477059532061,
+    "index_method": "HTTP range read of the end-of-central-directory + central directory"
+  },
+  "user_id": 68317,
+  "ranker": "mm_concat",
+  "top_k": 8,
+  "num_items": 8,
+  "num_available": 8,
+  "num_unavailable": 0,
+  "items": {
+    "18110": {
+      "item_id": 18110,
+      "official_video_id": 5890,
+      "rank": 1,
+      "title": "熊出没真的细节到了极致！ #熊出没",
+      "sources": [
+        "itemcf"
+      ],
+      "recall_rank": {
+        "itemcf": 151
+      },
+      "mm_rank": 1,
+      "baseline_rank": 230,
+      "rank_delta": 229,
+      "popularity_bucket": "tail",
+      "train_interactions": 9,
+      "is_zero_train_signal": false,
+      "available": true,
+      "verified": true,
+      "likes": 15000,
+      "views": 288000,
+      "source_codec": "hevc",
+      "source_bytes": 4556924,
+      "playback_codec": "h264",
+      "playback_duration_s": 15.0,
+      "clip_seconds": 15.0,
+      "note": "transcoded from the original HEVC to H.264 for browser playback; the clip is the first 15s of the source video",
+      "local_path": "data/demo_media/5890.mp4",
+      "bytes": 1188186,
+      "sha256": "04454976dfc9b402"
+    },
+    "17596": {
+      "item_id": 17596,
+      "official_video_id": 8567,
+      "rank": 2,
+      "title": "personally enter the game",
+      "sources": [
+        "itemcf"
+      ],
+      "recall_rank": {
+        "itemcf": 134
+      },
+      "mm_rank": 2,
+      "baseline_rank": 147,
+      "rank_delta": 145,
+      "popularity_bucket": "tail",
+      "train_interactions": 9,
+      "is_zero_train_signal": false,
+      "available": true,
+      "verified": true,
+      "likes": 116000,
+      "views": 969000,
+      "source_codec": "hevc",
+      "source_bytes": 20197165,
+      "playback_codec": "h264",
+      "playback_duration_s": 15.0,
+      "clip_seconds": 15.0,
+      "note": "transcoded from the original HEVC to H.264 for browser playback; the clip is the first 15s of the source video",
+      "local_path": "data/demo_media/8567.mp4",
+      "bytes": 1714174,
+      "sha256": "452a5b6394712f9d"
+    },
+    "18860": {
+      "item_id": 18860,
+      "official_video_id": 983,
+      "rank": 3,
+      "title": "Bear Haunt with me Bear core preview",
+      "sources": [
+        "itemcf"
+      ],
+      "recall_rank": {
+        "itemcf": 167
+      },
+      "mm_rank": 3,
+      "baseline_rank": 76,
+      "rank_delta": 73,
+      "popularity_bucket": "tail",
+      "train_interactions": 10,
+      "is_zero_train_signal": false,
+      "available": true,
+      "verified": true,
+      "likes": 32000,
+      "views": 394000,
+      "source_codec": "hevc",
+      "source_bytes": 4259645,
+      "playback_codec": "h264",
+      "playback_duration_s": 15.0,
+      "clip_seconds": 15.0,
+      "note": "transcoded from the original HEVC to H.264 for browser playback; the clip is the first 15s of the source video",
+      "local_path": "data/demo_media/983.mp4",
+      "bytes": 679676,
+      "sha256": "6a62bce861c9e0fa"
+    },
+    "19433": {
+      "item_id": 19433,
+      "official_video_id": 19496,
+      "rank": 4,
+      "title": "49 sets: The minesweeper team carrying the Arsenal into the minefield",
+      "sources": [
+        "itemcf"
+      ],
+      "recall_rank": {
+        "itemcf": 14
+      },
+      "mm_rank": 4,
+      "baseline_rank": 321,
+      "rank_delta": 317,
+      "popularity_bucket": "tail",
+      "train_interactions": 1,
+      "is_zero_train_signal": false,
+      "available": true,
+      "verified": true,
+      "likes": 15000,
+      "views": 720000,
+      "source_codec": "hevc",
+      "source_bytes": 31357297,
+      "playback_codec": "h264",
+      "playback_duration_s": 15.0,
+      "clip_seconds": 15.0,
+      "note": "transcoded from the original HEVC to H.264 for browser playback; the clip is the first 15s of the source video",
+      "local_path": "data/demo_media/19496.mp4",
+      "bytes": 2516997,
+      "sha256": "6f8fa565cf19fef1"
+    },
+    "17116": {
+      "item_id": 17116,
+      "official_video_id": 13048,
+      "rank": 5,
+      "title": "an army that disappeared less than two years after the outbreak of the war. In the early period of the Anti-Japanese War",
+      "sources": [
+        "semantic"
+      ],
+      "recall_rank": {
+        "semantic": 30
+      },
+      "mm_rank": 5,
+      "baseline_rank": 284,
+      "rank_delta": 279,
+      "popularity_bucket": "tail",
+      "train_interactions": 7,
+      "is_zero_train_signal": false,
+      "available": true,
+      "verified": true,
+      "likes": 52000,
+      "views": 684000,
+      "source_codec": "hevc",
+      "source_bytes": 3773112,
+      "playback_codec": "h264",
+      "playback_duration_s": 15.0,
+      "clip_seconds": 15.0,
+      "note": "transcoded from the original HEVC to H.264 for browser playback; the clip is the first 15s of the source video",
+      "local_path": "data/demo_media/13048.mp4",
+      "bytes": 2699009,
+      "sha256": "d35c4e85c6004518"
+    },
+    "16937": {
+      "item_id": 16937,
+      "official_video_id": 73,
+      "rank": 6,
+      "title": "this time Dudu is really back",
+      "sources": [
+        "itemcf"
+      ],
+      "recall_rank": {
+        "itemcf": 110
+      },
+      "mm_rank": 6,
+      "baseline_rank": 103,
+      "rank_delta": 97,
+      "popularity_bucket": "head",
+      "train_interactions": 51,
+      "is_zero_train_signal": false,
+      "available": true,
+      "verified": true,
+      "likes": 198000,
+      "views": 4267000,
+      "source_codec": "hevc",
+      "source_bytes": 2138106,
+      "playback_codec": "h264",
+      "playback_duration_s": 15.0,
+      "clip_seconds": 15.0,
+      "note": "transcoded from the original HEVC to H.264 for browser playback; the clip is the first 15s of the source video",
+      "local_path": "data/demo_media/73.mp4",
+      "bytes": 812399,
+      "sha256": "2707674dfdfeb886"
+    },
+    "18100": {
+      "item_id": 18100,
+      "official_video_id": 9295,
+      "rank": 7,
+      "title": "Sichuan army soul return home",
+      "sources": [
+        "semantic"
+      ],
+      "recall_rank": {
+        "semantic": 15
+      },
+      "mm_rank": 7,
+      "baseline_rank": 535,
+      "rank_delta": 528,
+      "popularity_bucket": "tail",
+      "train_interactions": 1,
+      "is_zero_train_signal": false,
+      "available": true,
+      "verified": true,
+      "likes": 20000,
+      "views": 397000,
+      "source_codec": "hevc",
+      "source_bytes": 10596409,
+      "playback_codec": "h264",
+      "playback_duration_s": 15.0,
+      "clip_seconds": 15.0,
+      "note": "transcoded from the original HEVC to H.264 for browser playback; the clip is the first 15s of the source video",
+      "local_path": "data/demo_media/9295.mp4",
+      "bytes": 2994356,
+      "sha256": "14dd16c31a7220b0"
+    },
+    "18408": {
+      "item_id": 18408,
+      "official_video_id": 1133,
+      "rank": 8,
+      "title": "Boonie Bear Monster Project 2 in the hilarious moment",
+      "sources": [
+        "semantic"
+      ],
+      "recall_rank": {
+        "semantic": 75
+      },
+      "mm_rank": 8,
+      "baseline_rank": 120,
+      "rank_delta": 112,
+      "popularity_bucket": "tail",
+      "train_interactions": 13,
+      "is_zero_train_signal": false,
+      "available": true,
+      "verified": true,
+      "likes": 35000,
+      "views": 540000,
+      "source_codec": "hevc",
+      "source_bytes": 7901252,
+      "playback_codec": "h264",
+      "playback_duration_s": 15.0,
+      "clip_seconds": 15.0,
+      "note": "transcoded from the original HEVC to H.264 for browser playback; the clip is the first 15s of the source video",
+      "local_path": "data/demo_media/1133.mp4",
+      "bytes": 1241286,
+      "sha256": "284e911bfad31575"
+    }
+  },
+  "playback": {
+    "transcoded": true,
+    "reason": "the official videos are HEVC/H.265, which browsers cannot decode; the playable file is an H.264 transcode of the first 15s",
+    "clip_seconds": 15.0,
+    "max_height": 720
+  },
+  "note": "item_id is the raw MicroLens item id used by the API and the UI; official_video_id is the MicroLens video identifier, which is also the mp4 filename stem. These are raw playback videos for the demo feed; the ranking model uses ID + text + image features, not the video stream."
+}

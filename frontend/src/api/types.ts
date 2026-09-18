@@ -222,3 +222,45 @@ export interface EvaluationResponse {
   source_contribution: Record<string, number | string | null>[];
   notes: Record<string, string>;
 }
+
+export interface MediaItem {
+  item_id: number;
+  internal_item_id?: number;
+  available: boolean;
+  verified: boolean;
+  official_video_id?: number | null;
+  title?: string | null;
+  rank?: number | null;
+  sources: string[];
+  baseline_rank?: number | null;
+  rank_delta?: number | null;
+  popularity_bucket?: Bucket | null;
+  train_interactions?: number | null;
+  is_zero_train_signal?: boolean;
+  bytes?: number | null;
+  likes?: number | null;
+  views?: number | null;
+  media_url?: string | null;
+  reason?: string | null;
+}
+
+export interface FeedResponse {
+  user_id: number | null;
+  num_items: number;
+  prepared: boolean;
+  items: MediaItem[];
+}
+
+export interface MediaManifest {
+  prepared: boolean;
+  source?: string | null;
+  verified_mapping?: boolean | null;
+  mapping_report?: Record<string, unknown> | null;
+  user_id?: number | null;
+  ranker?: string | null;
+  num_items?: number | null;
+  num_available?: number | null;
+  items?: MediaItem[];
+  note?: string | null;
+  hint?: string | null;
+}

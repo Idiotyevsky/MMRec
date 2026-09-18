@@ -1,0 +1,19 @@
+{
+  "method": "exact millisecond timestamp join",
+  "hf_interactions": 719405,
+  "official_interactions": 719405,
+  "unambiguous_timestamp_matches": 719299,
+  "matched_fraction": 0.999853,
+  "items_mapped": 19738,
+  "official_video_id_range": [
+    1,
+    19738
+  ],
+  "item_mapping_is_bijection": true,
+  "user_pairs_distinct_hf": 100000,
+  "user_mapping_is_bijection": true,
+  "sources": {
+    "hf_interactions": "data/raw/microlens_100k.inter",
+    "official_pairs": "data/raw/official/MicroLens-100k_pairs.csv"
+  }
+}

@@ -1,11 +1,13 @@
 import { NavLink, Navigate, Route, Routes } from "react-router-dom";
 import LiveDemo from "./pages/LiveDemo";
+import WatchFeed from "./pages/WatchFeed";
 import Inspector from "./pages/Inspector";
 import ColdStart from "./pages/ColdStart";
 import System from "./pages/System";
 
 const NAV = [
   { to: "/", label: "Live Demo" },
+  { to: "/watch", label: "Feed View" },
   { to: "/inspect", label: "Inspector" },
   { to: "/cold", label: "Cold Start" },
   { to: "/system", label: "System" },
@@ -30,6 +32,7 @@ export default function App() {
       <main className="content">
         <Routes>
           <Route path="/" element={<LiveDemo />} />
+          <Route path="/watch" element={<WatchFeed />} />
           <Route path="/inspect" element={<Inspector />} />
           <Route path="/cold" element={<ColdStart />} />
           <Route path="/system" element={<System />} />

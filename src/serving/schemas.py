@@ -171,3 +171,45 @@ class LegacyRecommendRequest(BaseModel):
 class LegacyRecommendResponse(BaseModel):
     items: list[dict]
     latency_ms: float
+
+
+class MediaItemOut(BaseModel):
+    item_id: int = Field(..., description="raw MicroLens item id")
+    internal_item_id: int | None = None
+    available: bool
+    verified: bool
+    official_video_id: int | None = None
+    title: str | None = None
+    rank: int | None = None
+    sources: list[str] = Field(default_factory=list)
+    baseline_rank: int | None = None
+    rank_delta: int | None = None
+    popularity_bucket: str | None = None
+    train_interactions: int | None = None
+    is_zero_train_signal: bool = False
+    bytes: int | None = None
+    likes: int | None = None
+    views: int | None = None
+    media_url: str | None = None
+    reason: str | None = None
+
+
+class FeedResponse(BaseModel):
+    user_id: int | None = None
+    num_items: int
+    prepared: bool
+    items: list[MediaItemOut]
+
+
+class MediaManifestResponse(BaseModel):
+    prepared: bool
+    source: str | None = None
+    verified_mapping: bool | None = None
+    mapping_report: dict | None = None
+    user_id: int | None = None
+    ranker: str | None = None
+    num_items: int | None = None
+    num_available: int | None = None
+    items: list[MediaItemOut] = Field(default_factory=list)
+    note: str | None = None
+    hint: str | None = None
