@@ -141,15 +141,21 @@ export default function Inspector() {
           >
             <div className="row" style={{ gap: 6, marginBottom: 14 }}>
               <span className="small muted">Pick a served item:</span>
-              {data.final_top_k.slice(0, 12).map((e) => (
-                <button
-                  key={e.item_id}
-                  className={selected === e.item_id ? "primary" : ""}
-                  onClick={() => setSelected(e.item_id)}
-                >
-                  #{e.item_id}
-                </button>
-              ))}
+              {(() => {
+                // the served items, plus whatever is selected (which may be a
+                // candidate that moved but did not make the final top-K)
+                const ids = data.final_top_k.slice(0, 12).map((e) => e.item_id);
+                if (selected !== null && !ids.includes(selected)) ids.unshift(selected);
+                return ids.map((id) => (
+                  <button
+                    key={id}
+                    className={selected === id ? "primary" : ""}
+                    onClick={() => setSelected(id)}
+                  >
+                    #{id}
+                  </button>
+                ));
+              })()}
             </div>
 
             {picked && (
@@ -304,7 +310,10 @@ export default function Inspector() {
                     <div className="panel-title">Moved up by multimodal</div>
                     {data.moved_up_by_multimodal.length === 0 && <div className="muted small">none</div>}
                     {data.moved_up_by_multimodal.map((e) => (
-                      <div className="kv" key={e.item_id}>
+                      <div className="kv" key={e.item_id}
+                           onClick={() => setSelected(e.item_id)}
+                           style={{ cursor: "pointer" }}
+                           title="show this item's trace">
                         <span className="k mono">#{e.item_id}</span>
                         <span className="v">
                           <Badge kind="cold">↑{e.position_delta}</Badge>{" "}
@@ -317,7 +326,10 @@ export default function Inspector() {
                     <div className="panel-title">Moved down</div>
                     {data.moved_down_by_multimodal.length === 0 && <div className="muted small">none</div>}
                     {data.moved_down_by_multimodal.map((e) => (
-                      <div className="kv" key={e.item_id}>
+                      <div className="kv" key={e.item_id}
+                           onClick={() => setSelected(e.item_id)}
+                           style={{ cursor: "pointer" }}
+                           title="show this item's trace">
                         <span className="k mono">#{e.item_id}</span>
                         <span className="v">
                           <Badge kind="tail">↓{e.position_delta}</Badge>{" "}

@@ -1,16 +1,16 @@
 {
   "user_id": 68317,
-  "quality": 1060.0,
+  "quality": 1144.0,
   "history_length": 6,
   "recall_sources_in_top": [
     "itemcf",
     "semantic"
   ],
   "multi_source_candidates": 1,
-  "max_rank_move": 528,
+  "max_rank_move": 570,
   "moved_item": {
-    "item_id": 18101,
-    "position_delta": 528,
+    "item_id": 16184,
+    "position_delta": 570,
     "sources": [
       "semantic"
     ]

@@ -300,6 +300,10 @@ class TwoStageRecommender:
                     moved_up.append({**e, "position_delta": delta})
                 elif delta <= -5:
                     moved_down.append({**e, "position_delta": -delta})
+            # lead with the biggest movers: that is the interesting part of the
+            # comparison, and the UI only shows the first few
+            moved_up.sort(key=lambda e: -e["position_delta"])
+            moved_down.sort(key=lambda e: -e["position_delta"])
 
         rr = rerank(entries, RerankConfig(exploration=cold_exploration),
                     final_k=20, history=set(hist))
