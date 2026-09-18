@@ -761,12 +761,180 @@ def source_table() -> str:
          "than one channel._")
 
 
+# ----------------------------------------------------------------------
+# Portfolio-page blocks.  Same rule as the tables: every number is computed
+# from the artifact that measures it, never typed in.
+# ----------------------------------------------------------------------
+SUMMARY_MODELS = [
+    ("sasrec", "-", "0.0", "SASRec (ID only)"),
+    ("mm_sasrec", "concat", "0.0", "MM-SASRec Concat"),
+    ("mm_sasrec", "gated", "0.0", "MM-SASRec Gated"),
+    ("mm_sasrec", "concat", "0.2", "MM-SASRec Concat + ID dropout"),
+    ("sasrec", "-", "0.2", "SASRec + item dropout"),
+]
+
+
+def overall_summary_table() -> str:
+    """The four or five rows a first-time reader needs, from ``overall.csv``."""
+    rows = [r for r in group_seeds(read("overall.csv")) if is_base(r)]
+    if not rows:
+        return f"_No finished runs yet — {TBD}._"
+    body = []
+    for model, fusion, idrop, name in SUMMARY_MODELS:
+        r = _pick(rows, model=model, fusion=fusion, id_dropout=idrop)
+        if r is None:
+            continue
+        body.append([
+            name, fmt(r.get("Recall@10")), fmt(r.get("Recall@20")),
+            fmt(r.get("NDCG@20")), _seeds(r),
+        ])
+    if not body:
+        return f"_No headline runs finished yet — {TBD}._"
+    return md_table(["Model", "Recall@10", "Recall@20", "NDCG@20", "Seeds"], body)
+
+
+def _hero_numbers() -> dict:
+    """The three headline numbers, each read from its own artifact."""
+    out: dict[str, object] = {}
+    overall = [r for r in group_seeds(read("overall.csv")) if is_base(r)]
+    base = _pick(overall, model="sasrec", fusion="-", id_dropout="0.0")
+    mm = _pick(overall, model="mm_sasrec", fusion="concat", id_dropout="0.0")
+    r0, r1 = _num(base, "Recall@20"), _num(mm, "Recall@20")
+    if r0 is not None and r1 is not None:
+        out["sasrec_r20"] = r0
+        out["mm_r20"] = r1
+        out["gain_pct"] = (r1 / r0 - 1.0) * 100.0
+        out["seeds"] = mm.get("n_seeds", base.get("n_seeds", "?"))
+
+    recall = read("recall_eval.csv")
+    merged = next((r for r in recall if r.get("channel") == "merged"), None)
+    best = None
+    for r in recall:
+        if r.get("channel") == "merged":
+            continue
+        v = _num(r, "Recall@1000")
+        if v is not None and (best is None or v > _num(best, "Recall@1000")):
+            best = r
+    if merged is not None:
+        out["merged_r1000"] = _num(merged, "Recall@1000")
+    if best is not None:
+        out["best_channel"] = best.get("channel")
+        out["best_channel_r1000"] = _num(best, "Recall@1000")
+
+    trade = read("pipeline_tradeoff.csv")
+    if trade:
+        pick = None
+        for r in trade:
+            try:
+                if int(float(r.get("candidate_k", 0))) == 1000:
+                    pick = r
+            except (TypeError, ValueError):
+                continue
+        if pick is None:
+            pick = max(trade, key=lambda r: _num(r, "recall_retention") or 0)
+        out["retention"] = _num(pick, "recall_retention")
+        out["retention_k"] = pick.get("candidate_k")
+        out["full_r20"] = _num(pick, "full_Recall@20")
+    return out
+
+
+def hero_metrics() -> str:
+    """Three metric cards.  HTML table because GitHub renders it consistently."""
+    n = _hero_numbers()
+    if not n:
+        return f"_Headline metrics unavailable — {TBD}._"
+    gain = n.get("gain_pct")
+    gain_txt = f"{gain:+.1f}% vs SASRec" if isinstance(gain, float) else TBD
+    seeds = n.get("seeds", "?")
+    cells = [
+        (f"{n['mm_r20'] * 100:.2f}%", "Recall@20", f"{gain_txt} · {seeds} seeds"),
+        (f"{n['merged_r1000'] * 100:.1f}%", "Recall@1000", "multi-channel recall pool"),
+        (f"{n['retention'] * 100:.1f}%", "Recall retained",
+         f"{n['retention_k']} candidates · same checkpoint"),
+    ]
+    tds = "\n".join(
+        f'<td align="center" width="33%">\n\n'
+        f'<strong>{v}</strong><br/>\n{b}<br/>\n<sub>{s}</sub>\n\n</td>'
+        for v, b, s in cells
+    )
+    return f"<table>\n<tr>\n{tds}\n</tr>\n</table>"
+
+
+def case_study() -> str:
+    """The demo trace, read from the media manifest written by the pipeline."""
+    manifest = ROOT / "artifacts" / "demo_media_manifest.json"
+    if not manifest.exists():
+        return f"_Demo trace unavailable — {TBD}._"
+    try:
+        data = json.loads(manifest.read_text(encoding="utf-8"))
+    except Exception:
+        return f"_Demo trace unreadable — {TBD}._"
+    items = list((data.get("items") or {}).values())
+    if not items:
+        return f"_Demo trace empty — {TBD}._"
+
+    def delta(it: dict) -> float:
+        try:
+            return float(it.get("rank_delta") or 0)
+        except (TypeError, ValueError):
+            return 0.0
+
+    it = max(items, key=delta)
+    user = data.get("user_id", TBD)
+    sources = ", ".join(str(s).capitalize() for s in (it.get("sources") or [])) or TBD
+    title = it.get("title") or "no catalogue title"
+    if len(title) > 72:
+        title = title[:69].rstrip() + "..."
+    baseline = it.get("baseline_rank")
+    rank = it.get("rank")
+    return md_table(
+        ["Request", "Value"],
+        [
+            ["User", f"`{user}`"],
+            ["Item", f"`{it.get('item_id')}` — {title}"],
+            ["Recalled by", sources],
+            ["ID-only SASRec rank", f"#{baseline}" if baseline is not None else TBD],
+            ["MM-SASRec rank", f"#{rank}" if rank is not None else TBD],
+            ["Movement", f"↑ {int(delta(it))} positions" if delta(it) else TBD],
+            ["MicroLens video", f"`{it.get('official_video_id')}` "
+                                f"({it.get('source_codec')} → {it.get('playback_codec')})"],
+        ],
+    )
+
+
+def media_summary() -> str:
+    """Two numbers and a link; the full proof lives in docs/media_provenance.md."""
+    manifest = ROOT / "artifacts" / "demo_media_manifest.json"
+    if not manifest.exists():
+        return f"_Media mapping not prepared — {TBD}._"
+    try:
+        data = json.loads(manifest.read_text(encoding="utf-8"))
+    except Exception:
+        return f"_Media manifest unreadable — {TBD}._"
+    rep = data.get("mapping_report") or {}
+    if not rep:
+        return f"_Media mapping report missing — {TBD}._"
+    frac = rep.get("matched_fraction")
+    items = rep.get("items_mapped")
+    ok = rep.get("item_mapping_is_bijection")
+    return (
+        f"| | |\n|---|---|\n"
+        f"| Timestamp agreement | {frac * 100:.3f} % |\n"
+        f"| Item mapping | {items:,} items, bijection: **{ok}** |\n"
+        f"| Independent check | `x_label` vs official views, 59× the shuffled control |"
+    )
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", default=None)
     args = ap.parse_args()
 
     sections = {
+        "HERO:METRICS": hero_metrics(),
+        "CASE:DEMO": case_study(),
+        "CASE:MEDIA": media_summary(),
+        "OVERALL_SUMMARY": overall_summary_table(),
         "OVERALL": overall_table(),
         "RECALL": recall_table(),
         "PIPELINE": pipeline_table(),

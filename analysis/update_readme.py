@@ -38,22 +38,29 @@ def main() -> None:
     )
     if gen.returncode != 0:
         raise SystemExit(gen.stderr)
-    blocks = dict(re.findall(r"<!-- (\w+) -->\n(.*?)(?=\n<!-- |\Z)", gen.stdout, flags=re.S))
+    # `make_readme_tables` emits `<!-- KIND:KEY -->` for the portfolio blocks and
+    # a bare `<!-- KEY -->` for the result tables; a bare key defaults to TABLE,
+    # which keeps every original marker working unchanged.
+    blocks: dict[str, str] = {}
+    for kind, key, body in re.findall(
+        r"<!-- (?:([A-Za-z]+):)?(\w+) -->\n(.*?)(?=\n<!-- |\Z)", gen.stdout, flags=re.S
+    ):
+        blocks[f"{kind or 'TABLE'}:{key}"] = body
 
     readme = Path(args.readme)
     text = readme.read_text(encoding="utf-8")
     original = text
 
     injected = []
-    for key, body in blocks.items():
+    for full, body in blocks.items():
         pattern = re.compile(
-            rf"(<!-- TABLE:{key} -->\n).*?(\n<!-- /TABLE:{key} -->)", flags=re.S
+            rf"(<!-- {full} -->\n).*?(\n<!-- /{full} -->)", flags=re.S
         )
         if not pattern.search(text):
-            print(f"  marker TABLE:{key} not found in README -- skipped")
+            print(f"  marker {full} not found in README -- skipped")
             continue
         text = pattern.sub(lambda m: m.group(1) + body.strip() + m.group(2), text)
-        injected.append(key)
+        injected.append(full)
 
     if args.check:
         if text != original:
@@ -62,8 +69,8 @@ def main() -> None:
         print(f"README tables are up to date ({len(injected)} checked)")
         return
 
-    for key in injected:
-        print(f"  injected TABLE:{key}")
+    for full in injected:
+        print(f"  injected {full}")
 
     readme.write_text(text, encoding="utf-8")
     print(f"wrote {readme}")

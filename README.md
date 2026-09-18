@@ -1,23 +1,115 @@
-# ShortRec
+<h1 align="center">ShortRec</h1>
 
-**Multimodal two-stage recommendation for short-video feeds.**
+<p align="center"><strong>Multimodal Two-Stage Recommendation for Short-Video Feeds</strong></p>
 
-ShortRec is an offline + serving prototype that studies one practical problem:
+<p align="center">Multi-Channel Recall · Sequential Ranking · Cold Start · Long Tail</p>
 
-> How can a short-video platform recommend **new and low-frequency content** when
-> collaborative interaction signals are sparse or absent?
+<p align="center">
+  <img src="https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white" alt="Python">
+  <img src="https://img.shields.io/badge/PyTorch-2.x-EE4C2C?logo=pytorch&logoColor=white" alt="PyTorch">
+  <img src="https://img.shields.io/badge/FastAPI-serving-009688?logo=fastapi&logoColor=white" alt="FastAPI">
+  <img src="https://img.shields.io/badge/React-Vite%20%2B%20TS-61DAFB?logo=react&logoColor=black" alt="React">
+  <img src="https://img.shields.io/github/actions/workflow/status/Idiotyevsky/MMRec/tests.yml?branch=main&label=CI" alt="CI">
+</p>
 
-It combines **Popular, ItemCF and semantic content recall** with **SASRec-based
-multimodal ranking**, and ships an interactive inspector for understanding how
-recall channels, content features and sparse collaborative signals shape the
-final feed. It is an offline + serving prototype on a public dataset — not a
-production deployment.
+ShortRec is an offline + serving prototype for short-video recommendation. It
+combines multi-channel candidate recall with multimodal sequential ranking, and
+studies how content signals help when collaborative interactions are sparse or
+absent.
 
-![ShortRec demo](assets/shortrec_demo.gif)
+> **Problem:** How do you recommend new and low-frequency videos when ID-based
+> collaborative signals are weak or unavailable?
 
-<p align="center"><em>One real request: history → three recall channels → candidate merge → multimodal ranking → served feed → the trace behind a single recommendation.</em></p>
+[Demo](#demo) · [Key Results](#key-results) · [Architecture](#architecture) · [Evaluation](#evaluation) · [Cold Start](#cold-start) · [Quick Start](#quick-start)
+
+---
+
+## Demo
+
+**How a recommendation is generated** — one request, end to end: user history →
+multi-channel recall → candidate merge → MM-SASRec ranking → served feed →
+recommendation trace.
+
+<p align="center">
+  <img src="assets/shortrec_demo.gif" width="100%" alt="ShortRec pipeline demo">
+</p>
+
+<p align="center"><sub>Recorded from the running application. Every number comes from the live request, not a mock.</sub></p>
+
+## Key Results
+
+<!-- HERO:METRICS -->
+<table>
+<tr>
+<td align="center" width="33%">
+
+<strong>13.93%</strong><br/>
+Recall@20<br/>
+<sub>+13.8% vs SASRec · 3 seeds</sub>
+
+</td>
+<td align="center" width="33%">
+
+<strong>30.0%</strong><br/>
+Recall@1000<br/>
+<sub>multi-channel recall pool</sub>
+
+</td>
+<td align="center" width="33%">
+
+<strong>95.8%</strong><br/>
+Recall retained<br/>
+<sub>1000 candidates · same checkpoint</sub>
+
+</td>
+</tr>
+</table>
+<!-- /HERO:METRICS -->
+
+Full-catalogue ranking on the held-out test split, 3 seeds. Multi-channel recall
+measured over 100 000 users. Retention compares the two-stage pipeline against
+the **same checkpoint and the same users** ranked over the whole catalogue.
+
+## The Problem
+
+A short-video platform produces new videos continuously. Those items have no
+clicks, no watch history and no co-occurrence — a learned ID embedding has
+nothing to learn from. Content features, by contrast, exist the moment a video is
+uploaded.
+
+The question is therefore not "content instead of collaborative filtering", but
+whether content semantics can **complement** a strong ID signal on warm items and
+carry the load on items where that signal is missing.
+
+<!-- TABLE:DATASET -->
+| split | users | items | interactions | sparsity | mean seq len | train interactions | median train item freq | items with 0 train freq | cold items |
+|---|---|---|---|---|---|---|---|---|---|
+| `base` | 100000 | 19738 | 719405 | 0.99964 | 7.19 | 519405 | 15.0 | 376 | 0 |
+| `cold10` | 99942 | 19738 | 659400 | 0.99967 | 6.60 | 459516 | 12.0 | 2300 | 1974 |
+<!-- /TABLE:DATASET -->
+
+`base` is the modelling split; `cold10` is the simulated cold-start benchmark.
+Dataset schema, filters and leakage policy: [`docs/data_schema.md`](docs/data_schema.md).
 
 ## Architecture
+
+<p align="center">
+  <img src="assets/system_architecture.png" width="900" alt="ShortRec architecture">
+</p>
+
+**Offline** builds the ranker checkpoints, the ItemCF neighbour index and the
+semantic content index. **Online** runs recall → merge → MM-SASRec ranking →
+lightweight rerank → Top-K.
+
+| Stage | Implementation |
+|---|---|
+| Recall | Popular (training frequency) · ItemCF (cosine co-occurrence) · Semantic (text + image, exact inner-product search) |
+| Merge | Reciprocal Rank Fusion over ranks, with every contributing channel kept on the candidate |
+| Rank | MM-SASRec — user behaviour sequence scored against ID + text + image item representations |
+| Rerank | seen filter · dedup · optional zero-train exploration quota |
+
+<details>
+<summary><b>Architecture details</b></summary>
 
 ```
                         OFFLINE · BATCH
@@ -49,247 +141,94 @@ production deployment.
                        Top-K feed
 ```
 
-## Three results
+> **Two evaluation protocols, never mixed.** *Full-catalogue ranking* scores every
+> item and is the strict model comparison. *Two-stage ranking* scores only
+> recalled candidates and simulates serving. The pipeline numbers below are
+> always reported against a same-checkpoint, same-user full-catalogue baseline.
 
+</details>
+
+## Product View
+
+**What the user actually sees** — the ranked list rendered as a playable feed:
+real MicroLens videos, swipe/Next, and "Why this video?" for any item.
+
+<p align="center">
+  <img src="assets/feed_playback_demo.gif" width="900" alt="ShortRec playable feed">
+</p>
+
+<p align="center"><sub>Videos are resolved from the official MicroLens media source through a verified item↔video mapping. Playback uses the raw video for visualization; the headline MM-SASRec ranker uses ID + text + image features.</sub></p>
+
+Because the Hugging Face modelling subset re-indexed its items, ShortRec
+reconstructs and verifies the official item↔video mapping rather than assuming
+`item_id == filename`:
+
+<!-- CASE:MEDIA -->
 | | |
 |---|---|
-| **Multimodal ranking** | MM-SASRec **12.24 % → 13.93 %** Recall@20 vs the ID-only baseline (**+13.8 %**, 3 seeds) |
-| **Multi-channel recall** | merged pool **Recall@1000 = 30.0 %**, above the best single channel (ItemCF 24.8 %) |
-| **Two-stage retention** | at 1 000 candidates the pipeline keeps **95.8 %** of the same checkpoint's full-catalogue Recall@20 |
+| Timestamp agreement | 99.985 % |
+| Item mapping | 19,738 items, bijection: **True** |
+| Independent check | `x_label` vs official views, 59× the shuffled control |
+<!-- /CASE:MEDIA -->
 
-## Why two stages?
+[How the media mapping is verified →](docs/media_provenance.md)
 
-**Full-catalogue evaluation** ranks all 19 738 items for every user. It is the
-strict model comparison.
+## One Recommendation, End to End
 
-**Two-stage serving** recalls a few hundred candidates and ranks only those. It
-simulates how a real recommender is deployed.
-
-The two answer different questions, use different protocols, and are reported in
-different tables. A pipeline number can legitimately be lower than the
-full-catalogue number for the same model; neither is wrong.
-
-## Why multimodal?
-
-```
-warm video        ID embedding + behaviour + content
-new / sparse      little or no collaborative signal
-                        │
-                        ▼
-                  content provides the only semantic signal
-```
-
-Multimodal content improves overall ranking, and content recall is the only
-channel that can reach an item with **zero** interactions. It does **not** solve
-cold start: content separates cold items from each other, but their scores are
-still not calibrated against warm items in a shared ranking. Both halves of that
-sentence are measured results — see the Cold-start section.
-
-## Product view
-
-The recommendation pipeline ultimately serves a ranked short-video feed. This is
-that feed: the served top-K rendered as playable videos, with the same
-recommendation trace the Inspector shows overlaid on each item.
-
-![ShortRec video feed](assets/feed_playback_demo.gif)
-
-<p align="center"><em>Playable feed — 20 recommended items as real MicroLens videos, swipe/Next through them, and "Why this video?" showing recall source, baseline rank and multimodal rank movement. The clip opens on item 16981: recalled only by the semantic channel, ranked #579 by the ID-only model and #19 by MM-SASRec.</em></p>
-
-Videos are resolved from the **official MicroLens media source** through a
-verified id mapping, and the overlay is generated from the live
-`/users/{u}/inspect` response — recall source, baseline rank, multimodal rank and
-popularity metadata are not mocked.
-
-### How the media is matched to a recommendation
-
-The modelling dataset is the HuggingFace re-upload `sisuo/Microlens_100k`, which
-**re-indexed both users and items** — its `itemID` is not the official MicroLens
-`videoID`. Binding a video by assuming `item_id == filename` would be wrong.
-
-`scripts/prepare_media_demo.py` therefore recovers the permutation from the
-official `MicroLens-100k_pairs.csv` by joining on the **exact millisecond
-timestamp**, and `scripts/verify_media_mapping.py` checks it:
-
-| check | result |
+<!-- CASE:DEMO -->
+| Request | Value |
 |---|---|
-| exact millisecond timestamp matches | 719 299 / 719 405 (99.985 %) |
-| item mapping is a bijection | 19 738 HF items → 19 738 distinct video ids, zero collisions |
-| user mapping is a bijection | 100 000 HF users → 100 000 distinct official users |
-| independent check: mean `x_label` vs official views | correlation 59× the shuffled control |
+| User | `68317` |
+| Item | `16981` — # Love me China strong China Wei # Salute to the Chinese people's Arm... |
+| Recalled by | Semantic |
+| ID-only SASRec rank | #579 |
+| MM-SASRec rank | #19 |
+| Movement | ↑ 560 positions |
+| MicroLens video | `19695` (hevc → h264) |
+<!-- /CASE:DEMO -->
 
-Video files in the official archive are `MicroLens-100k_videos/<videoID>.mp4`, so
-the recovered id is directly the filename. Only the needed videos are fetched,
-by HTTP range request against the split archive (the index alone is ~2 MB rather
-than 477 GB for the whole archive).
+Item 16981 is not recalled by Popular or ItemCF — semantic content recall is the
+only channel that retrieves it. Inside the same candidate pool, ID-only SASRec
+ranks it #579 and MM-SASRec moves it to #19.
 
-> **Playback media is a local artefact.** The official videos are HEVC/H.265,
-> which browsers cannot decode, so `scripts/prepare_media_demo.py` transcodes the
-> first 15 s of each needed video to H.264 and stores it under `data/demo_media/`.
-> That directory is **not** in git: the media is downloaded from the official
-> source and is not redistributed here. The ranking model itself uses ID + text +
-> image features, **not** the video stream.
+<p align="center">
+  <img src="assets/inspector_demo.png" width="900" alt="Recommendation Inspector">
+</p>
 
-## Demo
+<p align="center"><sub>Recommendation Inspector — pick any candidate and follow it from each recall channel through the merge and both rankers.</sub></p>
 
-![Recommendation Inspector](assets/inspector_demo.png)
+This is one request trace illustrating how content can matter; it does not claim
+that every multimodal gain comes from semantic-only items. The aggregate effect is
+in the ablation table below, including the cases where multimodal **loses**.
 
-<p align="center"><em>Recommendation Inspector — pick a served item and follow it from each recall channel through the merge and both rankers to its final position.</em></p>
+## How It Works
 
-![Cold Start Explorer](assets/cold_start_demo.png)
+**Multi-channel recall.** `Popular` is the always-available fallback for users
+with no history. `ItemCF` finds items that co-occur with what the user watched.
+`Semantic` embeds text and cover images and is the only channel that can retrieve
+an item with zero interactions.
 
-<p align="center"><em>Cold Start Explorer — an item with zero training interactions, its content availability, and the cold-only vs full-catalogue gap.</em></p>
-
-The demo has four pages:
-
-| route | page | answers |
-|---|---|---|
-| `/` | Live Demo | what does the system do with this user's history? |
-| `/watch` | Feed View | what does the user actually see? |
-| `/inspect` | Recommendation Inspector | why is *this* item recommended? |
-| `/cold` | Cold Start Explorer | why do new videos need content features? |
-| `/system` | System | is this a real system or a model demo? |
-
-## Motivation
-
-A short-video platform produces new videos every day. Those videos have no
-clicks, no watches, no co-occurrence — no collaborative signal at all. A model
-that represents an item by a learned ID embedding has nothing to learn for them.
-On MicroLens-100K this is not a corner case:
-
-* 99.96 % of the user × item matrix is empty;
-* the median item has a handful of training interactions;
-* 376 items have **zero** training interactions in the base split;
-* under the simulated cold split, 1 974 items have **every** training interaction
-  removed.
-
-ShortRec attacks this from two directions: a **content-based recall channel** that
-never looks at collaborative signal, and a **multimodal ranker** whose item
-representation mixes ID with text and cover-image features.
-
-## Dataset
-
-MicroLens-100K, downloaded from `huggingface.co/datasets/sisuo/Microlens_100k`.
-Full schema evidence in [`docs/data_schema.md`](docs/data_schema.md).
-
-<!-- TABLE:DATASET -->
-| split | users | items | interactions | sparsity | mean seq len | train interactions | median train item freq | items with 0 train freq | cold items |
-|---|---|---|---|---|---|---|---|---|---|
-| `base` | 100000 | 19738 | 719405 | 0.99964 | 7.19 | 519405 | 15.0 | 376 | 0 |
-| `cold10` | 99942 | 19738 | 659400 | 0.99967 | 6.60 | 459516 | 12.0 | 2300 | 1974 |
-<!-- /TABLE:DATASET -->
-
-### Data leakage policy
-
-| signal | source |
-|---|---|
-| item frequency, popularity buckets, recall scores | **training interactions only** |
-| ItemCF similarities, negative sampling | training interactions only |
-| cold-item selection | training protocol + fixed seed |
-| `x_label` / likes / views | **not used at all** |
-| evaluation | user history masked, ground truth protected |
-
-`ProcessedData.assert_no_target_leak()` re-checks on every load that no
-validation target appears in the train history and no test target appears in the
-train+val history. Details in [`docs/evaluation_protocol.md`](docs/evaluation_protocol.md).
-
-## Quick start
-
-```bash
-pip install -e ".[dev]"
-
-# 1. data (190 MB, one time)
-mkdir -p data/raw && (cd data/raw && \
-  for f in microlens_100k.inter text_feat.npy image_feat.npy video_feat.npy; do
-    curl -L -o "$f" "https://huggingface.co/datasets/sisuo/Microlens_100k/resolve/main/$f"
-  done)
-
-# 2. processed datasets
-python -m src.data.preprocess --out data/processed/base
-python -m src.data.preprocess --out data/processed/cold10 --cold-ratio 0.1 --cold-seed 42
-
-# 3. train the two headline rankers (~25 min on one L40S) — checkpoints are NOT in git
-python scripts/train.py --config configs/sasrec.yaml
-python scripts/train.py --config configs/mm_sasrec_concat.yaml
-
-# 4. build the recall indices
-python scripts/prepare_demo.py
-
-# 5. (optional) download + transcode the demo videos for the playable feed
-python scripts/prepare_media_demo.py --fetch-official
-
-# 6. run the demo
-bash scripts/start_demo.sh          # API :8000 + UI :5173
-```
-
-`/watch` needs step 5; everything else works without it. It accepts
-`/watch?user=68317&item=16981` to deep-link to one recommendation, and
-`--top-k` controls how many items are downloaded (`20` by default in the demo).
-
-Open <http://127.0.0.1:5173>. **A fresh clone needs trained checkpoints** — step 3
-is required, the demo is not one command from zero.
-
-The serving path is CPU-only by default; no GPU is needed to run the demo once
-the checkpoints exist.
-
-Sanity checks:
-
-```bash
-pytest -q
-python scripts/smoke_test.py
-python analysis/update_readme.py --check
-```
-
-## Two-stage pipeline
-
-### 1. Candidate recall (`src/recall`)
-
-Every channel implements one interface and returns at most `top_k` candidates,
-with **PAD never returned** and **the user's own history always excluded**.
-
-| channel | what it uses | what it is for |
-|---|---|---|
-| `popular` | training interaction counts | the always-available fallback; works for a brand-new user with no history |
-| `itemcf` | cosine-normalised item co-occurrence, `sim(i,j) = |U_i∩U_j| / sqrt(|U_i||U_j|)`, top-100 neighbours precomputed offline | finds items that co-occur with what the user watched — the workhorse of industrial recall |
-| `semantic` | `L2([L2(text) ; L2(image)])` content embedding, recency-weighted mean over the history, exact inner-product search | the only channel that can retrieve an item with **zero** interactions |
-
-Per-modality normalisation in the semantic channel is not cosmetic: raw text
-features are unit-norm while raw image features have norm ≈ 26, so concatenating
-them un-normalised would silently turn it into an image-only channel.
-
-> **Terminology.** Content retrieval uses `faiss.IndexFlatIP`, which is an
-> **exact** inner-product index. It is not approximate nearest neighbour; that
-> would need IVF/HNSW. Latencies reported here are exact-search latencies.
-
-### 2. Candidate merge (`src/recall/pipeline.py`)
-
-Channels produce incomparable scores — popularity counts (0…546), ItemCF
-similarity sums (0…10), cosine similarities (−1…1). The merge therefore ranks by
-**reciprocal rank fusion**:
+**Candidate merge.** Recall scores are not comparable across channels
+(popularity counts vs similarity sums vs cosine), so ShortRec ranks by reciprocal
+rank fusion and keeps the full source trace on every candidate:
 
 ```
 merge_score(j) = Σ_channels 1 / (60 + rank_channel(j))
 ```
 
-so no channel can dominate the pool just because its numbers are larger.
-Duplicates are **merged, not dropped**: the candidate keeps every contributing
-channel with its rank inside that channel, which is what the Inspector displays.
+**Multimodal sequential ranking.** MM-SASRec scores the merged candidates with the
+user's behaviour sequence against concatenated ID, text and image item
+representations. Concatenation is the default ranker; gated fusion is reported in
+the ablations.
 
-### 3. Ranking (`src/pipeline`)
+**Serving policy.** The final list applies seen filtering, deduplication and an
+optional zero-train exploration quota. The quota is an **exposure policy, not a
+model improvement** — offline metrics are measured with it off.
 
-The default ranker is **MM-SASRec with concatenation fusion** — the best 3-seed
-result in the offline table. `sasrec` (ID-only) and `mm_gated` are selectable in
-the UI for comparison. Only the merged candidate pool is scored.
-
-### 4. Reranking (`src/rerank/simple.py`)
-
-Three policies and nothing more: seen filter, dedup, and an optional
-**zero-train exploration quota** that guarantees at least *N* items with no
-training signal reach the final list.
-
-The quota is an **exposure policy, not a model improvement**. Offline metrics are
-measured with it off. It exists because the cold-item experiment shows content
-alone cannot out-score warm items in the full catalogue, so without a quota those
-items would receive no impressions at all.
+> **Why two stages?** Warm items have strong collaborative ID signals; sparse and
+> zero-train items do not. Content features provide a semantic signal that exists
+> before interactions accumulate — but they do not fix cold/warm score
+> calibration, as the cold-start section shows.
 
 ## Evaluation
 
@@ -306,20 +245,10 @@ items would receive no impressions at all.
 _Test target, user history masked, 100000 users. Candidate-generation quality: this is the ceiling the ranker can reach._
 <!-- /TABLE:RECALL -->
 
-### Which channel actually produced the recommendations?
+### Two-stage retention
 
-<!-- TABLE:SOURCES -->
-| Source | Top-20 hits | Share | Head hits | Middle hits | Tail hits |
-|---|---|---|---|---|---|
-| popular | 62 | 0.0446 | 62 | 0 | 0 |
-| itemcf | 382 | 0.2750 | 126 | 103 | 153 |
-| semantic | 131 | 0.0943 | 43 | 42 | 46 |
-| multiple | 814 | 0.5860 | 468 | 126 | 220 |
-
-_Candidate budget 2000. `multiple` means the item was found by more than one channel._
-<!-- /TABLE:SOURCES -->
-
-### Two-stage retention and serving latency
+Pipeline and full-catalogue are measured with the **same checkpoint on the same
+seeded user sample**, so the retention column is apples-to-apples.
 
 <!-- TABLE:PIPELINE -->
 | Candidate budget | Candidate recall | Pipeline Recall@20 | Retention | Recall latency (ms) | Score (ms) | Encode (ms) |
@@ -335,11 +264,124 @@ Same-checkpoint, same-user full-catalogue **Recall@20 = 0.1393** (10000 users, s
 Latency columns are from `scripts/benchmark_latency.py` (CPU, median, this machine) and are for relative comparison only. Note that the **encode** stage dominates: scoring the whole catalogue costs about the same as scoring a 100-item pool, so the two-stage split buys recall quality and catalogue headroom rather than latency at this scale.
 <!-- /TABLE:PIPELINE -->
 
-### Model results (full-catalogue ranking)
+### Headline ranking result
 
-Strict offline evaluation: every user, every item, the user's history masked, the
-ground truth never masked. **This is not the same measurement as the pipeline
-table above.**
+Full-catalogue ranking on the held-out test split, mean over seeds. The complete
+model matrix is under [Detailed Experiments](#detailed-experiments).
+
+<!-- TABLE:OVERALL_SUMMARY -->
+| Model | Recall@10 | Recall@20 | NDCG@20 | Seeds |
+|---|---|---|---|---|
+| SASRec (ID only) | 0.0852 ± 0.0012 | 0.1224 ± 0.0025 | 0.0557 ± 0.0009 | 3 runs |
+| MM-SASRec Concat | 0.0960 ± 0.0002 | 0.1393 ± 0.0003 | 0.0625 ± 0.0001 | 3 runs |
+| MM-SASRec Gated | 0.0851 | 0.1237 | 0.0560 | 1 run |
+| MM-SASRec Concat + ID dropout | 0.0982 ± 0.0015 | 0.1429 ± 0.0013 | 0.0637 ± 0.0010 | 2 runs |
+<!-- /TABLE:OVERALL_SUMMARY -->
+
+## Cold Start
+
+Two different notions of "cold" are kept apart in the code, the API and the UI:
+**simulated cold** (a controlled benchmark subset with all training interactions
+removed) and **zero-train signal** (items with no observed training interactions
+in the base split, which drive the serving exploration quota).
+
+<p align="center">
+  <img src="assets/cold_start_demo.png" width="900" alt="Cold Start Explorer">
+</p>
+
+<!-- TABLE:COLD -->
+| Model | Cold Recall@10 | Cold Recall@20 | Cold NDCG@10 | Cold NDCG@20 | ColdOnly Recall@10 | ColdOnly Recall@20 | #users with cold target |
+|---|---|---|---|---|---|---|---|
+| MM-SASRec (text+image, gated) [cold10] | 0.0001 | 0.0001 | 0.0000 | 0.0000 | 0.0687 | 0.1092 | 12717 |
+| MM-SASRec (id+text+image, gated) [cold10] | 0.0002 | 0.0007 | 0.0001 | 0.0002 | 0.0646 | 0.0983 | 12717 |
+| MM-SASRec (id+text+image, gated) + ID-dropout 0.2 [cold10] | 0.0001 | 0.0008 | 0.0000 | 0.0002 | 0.0456 | 0.0789 | 12717 |
+| Random (uniform) [cold10] | 0.0013 | 0.0016 | 0.0006 | 0.0007 | 0.0036 | 0.0097 | 12717 |
+| SASRec (ID-only) [cold10] | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 12717 |
+<!-- /TABLE:COLD -->
+
+Content features can tell cold items apart from each other. They still lose to
+warm items in a shared ranking, because the two score distributions are not
+calibrated against each other — that gap is the cold-start problem, and it is
+reported rather than smoothed over. The exploration quota is a mitigation, not a
+solution.
+
+<details>
+<summary><b>Cold-start protocol</b></summary>
+
+* 10 % of the catalogue (1 974 items) has **every** training interaction removed
+  by a fixed seed; validation and test targets are untouched.
+* 12 717 users have a cold test target.
+* Cold items keep their content features and their **ID representation is zeroed
+  at inference for every model**, so no model is credited for a
+  randomly-initialised embedding.
+* `ColdOnly *` ranks within the cold catalogue; `Cold *` ranks against all items.
+  They answer different questions and are not comparable.
+* Ranks use the **average-rank tie policy**; with an optimistic policy the tied
+  cold items would each be reported as a perfect hit.
+
+Full protocol: [`docs/evaluation_protocol.md`](docs/evaluation_protocol.md).
+
+</details>
+
+## Quick Start
+
+Trained checkpoints and the official video files are **not** redistributed in this
+repository, so a fresh clone needs training before the demo can run.
+
+```bash
+git clone https://github.com/Idiotyevsky/MMRec.git
+cd MMRec
+pip install -e ".[dev]"
+pytest -q                      # 287 tests, no data or GPU required
+python scripts/smoke_test.py   # end-to-end sanity check on synthetic data
+```
+
+<details>
+<summary><b>Full setup from raw data</b></summary>
+
+```bash
+# 1. data (190 MB, one time)
+mkdir -p data/raw && (cd data/raw && \
+  for f in microlens_100k.inter text_feat.npy image_feat.npy video_feat.npy; do
+    curl -L -o "$f" "https://huggingface.co/datasets/sisuo/Microlens_100k/resolve/main/$f"
+  done)
+
+# 2. processed datasets
+python -m src.data.preprocess --out data/processed/base
+python -m src.data.preprocess --out data/processed/cold10 --cold-ratio 0.1 --cold-seed 42
+
+# 3. train the two headline rankers (~25 min on one L40S)
+python scripts/train.py --config configs/sasrec.yaml
+python scripts/train.py --config configs/mm_sasrec_concat.yaml
+
+# 4. build the recall indices
+python scripts/prepare_demo.py
+
+# 5. (optional) demo videos for the playable feed
+python scripts/prepare_media_demo.py --fetch-official
+
+# 6. run it
+bash scripts/start_demo.sh          # API :8000 + UI :5173
+```
+
+</details>
+
+**Demo pages**
+
+| Page | Purpose |
+|---|---|
+| `/` | Live Demo — watch recall → rank happen |
+| `/watch` | Feed View — see the ranked videos |
+| `/inspect` | Inspector — explain one recommendation |
+| `/cold` | Cold Start — inspect sparse and new items |
+| `/system` | System — serving, evaluation and API |
+
+## Detailed Experiments
+
+<details>
+<summary><b>Full model comparison</b></summary>
+
+Strict full-catalogue ranking, mean ± std over seeds.
 
 <!-- TABLE:OVERALL -->
 | Model | Recall@10 | Recall@20 | NDCG@10 | NDCG@20 | MRR@20 | Coverage@20 | Params | #seeds |
@@ -372,7 +414,10 @@ table above.**
 _Every value above is computed from `results/tables/*.csv` by `analysis/make_readme_tables.py`; recall denominators are the evaluated test users named in each line._
 <!-- /TABLE:FINDINGS -->
 
-### Modality / fusion ablation
+</details>
+
+<details>
+<summary><b>Modality &amp; fusion ablations</b></summary>
 
 <!-- TABLE:ABLATION -->
 | Kind | ID | Text | Image | Video | Fusion | ID-dropout | Item-dropout | Recall@10 | Recall@20 | NDCG@20 | Params |
@@ -392,7 +437,10 @@ _Every value above is computed from `results/tables/*.csv` by `analysis/make_rea
 | MM | ✓ | ✓ | ✓ | ✓ | gated | — | — | 0.0879 | 0.1271 | 0.0574 | 3345668 |
 <!-- /TABLE:ABLATION -->
 
-### Long-tail analysis
+</details>
+
+<details>
+<summary><b>Long-tail analysis</b></summary>
 
 <!-- TABLE:LONGTAIL -->
 _Popularity rule: `frequency_quantile` (training interactions only)._
@@ -416,11 +464,6 @@ _Popularity rule: `frequency_quantile` (training interactions only)._
 | SASRec (ID-only) + item-dropout 0.2 | 0.1953 ± 0.0025 | 0.1256 ± 0.0021 | 0.0794 ± 0.0004 | 0.0923 ± 0.0005 | 0.0564 ± 0.0005 | 0.0327 ± 0.0004 |
 <!-- /TABLE:LONGTAIL -->
 
-### Where does the multimodal gain come from?
-
-`Δ vs SASRec` answers "does multimodal help?". `Δ vs ID+item-dropout` answers
-"is it the *content* or just the extra regularisation?". Both are needed.
-
 <!-- TABLE:GAIN -->
 | Model | ΔHead vs SASRec | ΔMiddle vs SASRec | ΔTail vs SASRec | ΔHead vs ID+item-drop | ΔMiddle vs ID+item-drop | ΔTail vs ID+item-drop |
 |---|---|---|---|---|---|---|
@@ -437,11 +480,10 @@ _Popularity rule: `frequency_quantile` (training interactions only)._
 | MM-SASRec (id+text+image, gated) + ID-dropout 0.2 | +0.0153 | +0.0085 | +0.0045 | +0.0078 | +0.0014 | +0.0003 |
 <!-- /TABLE:GAIN -->
 
-### Gate analysis
+</details>
 
-`python scripts/export_gates.py --run-dir <mm run>` then
-`python analysis/analyze_gates.py` produce
-`results/figures/modality_gate_distribution.png`.
+<details>
+<summary><b>Gate analysis</b></summary>
 
 <!-- TABLE:GATES -->
 _Mean over 13 documented run(s), from `results/tables/gate_by_bucket.csv`._
@@ -475,49 +517,30 @@ _Mean over 13 documented run(s), from `results/tables/gate_by_bucket.csv`._
 <!-- /TABLE:GATES -->
 
 The expected trend is present — the ID weight falls and the content weights rise
-monotonically from head to tail — but the magnitude is small. The model keeps
-most of its weight on the ID branch, which is exactly why naive gated fusion
-underperforms the ID-only baseline and why ID dropout is needed.
+monotonically from head to tail — but the magnitude is small. The model keeps most
+of its weight on the ID branch, which is why naive gated fusion underperforms the
+ID-only baseline and why ID dropout is needed.
 
-## Cold start
+</details>
 
-Two different notions of "cold" are kept strictly apart, in the code, the API and
-the UI:
+<details>
+<summary><b>Recall source attribution</b></summary>
 
-| | simulated cold | zero-train signal |
-|---|---|---|
-| what | controlled benchmark subset with **all** training interactions removed | items with zero observed training interactions in the base split |
-| where | `data/processed/cold10` (1 974 items) | base split (376 items) |
-| used for | the scientific cold-start experiment below | the serving exploration quota |
+<!-- TABLE:SOURCES -->
+| Source | Top-20 hits | Share | Head hits | Middle hits | Tail hits |
+|---|---|---|---|---|---|
+| popular | 62 | 0.0446 | 62 | 0 | 0 |
+| itemcf | 382 | 0.2750 | 126 | 103 | 153 |
+| semantic | 131 | 0.0943 | 43 | 42 | 46 |
+| multiple | 814 | 0.5860 | 468 | 126 | 220 |
 
-Simulated cold split: 10 % of items have every training interaction removed; they
-keep their content features and their ID representation is zeroed at inference
-for every model. 12 717 users have a cold test target.
+_Candidate budget 2000. `multiple` means the item was found by more than one channel._
+<!-- /TABLE:SOURCES -->
 
-`Cold *` = full ranking over all items for users whose target is cold.
-`ColdOnly *` = ranking restricted to the cold catalogue.
+</details>
 
-<!-- TABLE:COLD -->
-| Model | Cold Recall@10 | Cold Recall@20 | Cold NDCG@10 | Cold NDCG@20 | ColdOnly Recall@10 | ColdOnly Recall@20 | #users with cold target |
-|---|---|---|---|---|---|---|---|
-| MM-SASRec (text+image, gated) [cold10] | 0.0001 | 0.0001 | 0.0000 | 0.0000 | 0.0687 | 0.1092 | 12717 |
-| MM-SASRec (id+text+image, gated) [cold10] | 0.0002 | 0.0007 | 0.0001 | 0.0002 | 0.0646 | 0.0983 | 12717 |
-| MM-SASRec (id+text+image, gated) + ID-dropout 0.2 [cold10] | 0.0001 | 0.0008 | 0.0000 | 0.0002 | 0.0456 | 0.0789 | 12717 |
-| Random (uniform) [cold10] | 0.0013 | 0.0016 | 0.0006 | 0.0007 | 0.0036 | 0.0097 | 12717 |
-| SASRec (ID-only) [cold10] | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 12717 |
-<!-- /TABLE:COLD -->
-
-The two columns answer different questions and must not be compared to each
-other. The gap between them is the **cold/warm score calibration problem**: a
-content model can tell cold items apart from each other, but their scores are not
-comparable to warm items' scores in a shared ranking. That is what the serving
-layer's exploration quota exists to mitigate.
-
-Ranks use the **average-rank tie policy**. With an optimistic policy, the 1 974
-cold items all tied at score 0 would each be reported as a perfect hit — a
-measurement artefact rather than a result.
-
-## Efficiency
+<details>
+<summary><b>Efficiency details</b></summary>
 
 <!-- TABLE:EFFICIENCY -->
 |  | value |
@@ -533,13 +556,15 @@ measurement artefact rather than a result.
 | index build / query latency | 0.0417 s / 0.5017 ms per query |
 <!-- /TABLE:EFFICIENCY -->
 
-## Advanced extension: Semantic IDs and generative retrieval
+</details>
 
-`src/models/rqvae.py`, `src/models/semantic_id.py`, `src/models/generative_rec.py`
+<details>
+<summary><b>Semantic ID / generative retrieval extension</b></summary>
 
 Content embeddings are quantised into Semantic IDs with an RQVAE, and a small
-causal Transformer generates the next item's ID instead of scoring vectors.
-This is an **extension**, not part of the main architecture.
+causal Transformer generates the next item's ID instead of scoring vectors. This
+is an **extension**, not part of the main architecture: the project's core is
+multi-channel recall + multimodal ranking + cold-start analysis.
 
 <!-- TABLE:SEMANTICID -->
 |  |  |
@@ -555,120 +580,87 @@ This is an **extension**, not part of the main architecture.
 Three things had to be fixed before the codes were usable, all documented in the
 code: residual-aware code re-seeding, the commitment term, and per-modality
 normalisation. With random codebook initialisation and a codebook-only loss the
-collision rate was **49 %**, which would have made generative retrieval
-meaningless.
-
+collision rate was 49 %, which would have made generative retrieval meaningless.
 Decoding is constrained by a prefix trie, so the generator can only emit a code
-tuple that corresponds to a real item — never a hallucinated one, and never a
-random fallback.
+tuple that corresponds to a real item.
 
-## API
+</details>
 
-```
-GET /system                      dataset, rankers, recall channels, readiness
-GET /models                      rankers + offline metrics from results/tables
-GET /evaluation                  recall / pipeline / latency artifacts
-GET /users/{u}                   history with cold / bucket metadata
-GET /users/{u}/recall            candidate generation with per-source trace
-GET /users/{u}/recommend         the served top-K
-GET /users/{u}/inspect           full request trace (Inspector page)
-GET /cold/summary                cold-start experiment results
-GET /cold/items[/{id}]           cold items + content availability
-GET /media/manifest              prepared demo media + the id-mapping evidence
-GET /media/video/{item_id}       the prepared mp4 (integer id, manifest lookup only)
-GET /feed                        playable feed in recommendation order
-POST /recommend                  legacy history-based endpoint
-```
+## Engineering
 
-```bash
-curl -s --noproxy '*' localhost:8000/users/7/recommend?top_k=5
-```
+| | |
+|---|---|
+| Serving | FastAPI service; the API owns the single raw ↔ internal id conversion |
+| Retrieval | `faiss.IndexFlatIP` — **exact** inner product, not approximate |
+| Frontend | React + Vite + TypeScript; five pages, no chart library, no fake metadata |
+| Tests | unit + integration across data leakage, recall, ranking, serving and media provenance |
+| CI | `pytest` on Python 3.10 / 3.11 plus frontend typecheck and build |
 
-Item ids in the API are **raw MicroLens ids**. The conversion from the internal
-`1..N` id space happens in exactly one place (`src/serving/service.py`).
+<details>
+<summary><b>System dashboard</b></summary>
 
-![System page](assets/system_demo.png)
+<p align="center">
+  <img src="assets/system_demo.png" width="900" alt="ShortRec system dashboard">
+</p>
 
-<p align="center"><em>System — recall quality by candidate budget, two-stage retention, and serving latency split by stage.</em></p>
+<p align="center"><sub>Recall quality by candidate budget, two-stage retention, and serving latency split by stage — all read from <code>results/tables/</code>.</sub></p>
 
-## Repository structure
+</details>
 
 ```
-configs/          one YAML per experiment
-docs/             data_schema.md, evaluation_protocol.md, design.md
-src/data/         preprocessing, datasets, negative sampling, popularity, metadata
-src/models/       bpr, sasrec, mm_sasrec, item_encoder, fusion, rqvae, generative_rec
-src/recall/       popular, itemcf, semantic channels + candidate merge
-src/rerank/       seen filter, dedup, zero-train exploration quota
-src/pipeline/     ranker registry + two-stage recommender
-src/evaluation/   metrics, full-ranking evaluator, cold/tail slicing
-src/training/     model factory, trainer (AMP, early stopping, checkpointing)
-src/retrieval/    exact inner-product index (Faiss, with numpy fallback)
-src/serving/      service, schemas, FastAPI app
-scripts/          CLI entry points (train, prepare_demo, evaluate_recall, ...)
-analysis/         aggregation, plotting, gate analysis, README table generation
-frontend/         React + Vite + TypeScript demo (Live Demo / Inspector / Cold / System)
-tests/            unit + integration tests
-results/          runs/, tables/, figures/   (generated)
-artifacts/        indices, semantic IDs, demo manifest   (generated)
+GET /system  /models  /evaluation  /feed  /media/manifest
+GET /users/{u}  /users/{u}/recall  /users/{u}/recommend  /users/{u}/inspect
+GET /items/{id}/media   /media/video/{id}   /cold/summary   /cold/items
 ```
 
-## Reproducibility
-
-```python
-set_seed(seed)   # random, numpy, torch (CPU + CUDA), PYTHONHASHSEED
-```
-
+**Reproducibility.** `set_seed` covers Python, NumPy and Torch (CPU + CUDA).
 Negative sampling, cold-item selection and popularity bucketing use explicitly
-seeded generators. The pipeline evaluation draws its user sample with a fixed
-seed and records the sample hash in the artifact. Training data is fully in
-memory with `num_workers = 0`. Checkpoints store a dataset hash and refuse to
+seeded generators; the pipeline evaluation draws its user sample with a fixed
+seed and records the sample hash. Checkpoints carry a dataset hash and refuse to
 load into a dataset with a different item mapping or cold split.
 
-GPU kernels are not guaranteed to be bitwise deterministic. Runs are reproducible
-in distribution: same config + same seed ⇒ identical data order, negative samples
-and initialisation.
+**This README is generated.** Every table, the hero metrics and the case study are
+produced from `results/tables/*.csv` and `artifacts/*.json` by
+`python analysis/update_readme.py`; `--check` fails if the README and the
+artifacts disagree. Nothing here is typed in by hand.
 
 ## Limitations
 
-* **This is not a production system.** It is an offline + serving prototype on a
-  public dataset with a 19.7 K item catalogue. There is no streaming ingestion,
-  no feature store, no A/B harness.
+* **Not a production system.** It is an offline + serving prototype on a public
+  dataset with a 19.7 K item catalogue: no streaming ingestion, no feature store,
+  no online A/B test.
 * MicroLens-100K has short histories (median 6 interactions), which caps what any
   sequential model can learn.
-* The subset ships **no item titles or captions**, so the demo identifies items by
-  raw id and content-space neighbours only.
-* The cold protocol is **simulated** (interactions removed by a fixed seed), not a
-  naturally occurring cold-start stream.
-* Validation is used for early stopping, so validation numbers are optimistic;
-  test numbers are reported from the best checkpoint.
+* The cold protocol is **simulated**, not a naturally occurring cold-start stream.
 * Cold items remain poorly calibrated against warm items in the full catalogue.
-  The exploration quota is a mitigation, not a solution.
-* Content retrieval is **exact** (`IndexFlatIP`) and therefore O(catalogue) per
-  query. Approximate indexing (IVF/HNSW) is deliberately not claimed.
-* Serving latency numbers are CPU demo benchmarks on a shared machine, for
-  relative comparison only — not a production SLA.
-* Video features are wired through the architecture but the headline tables use
-  ID + text + image; the video ablation is reported separately.
-* Serving is single-process and CPU-only by default; the API has no
-  authentication, rate limiting or caching.
+  The exploration quota mitigates exposure; it does not fix ranking.
+* Content retrieval is **exact** and therefore O(catalogue) per query; approximate
+  indexing (IVF/HNSW) is deliberately not claimed.
+* Serving is single-process and CPU-only, with no authentication, rate limiting or
+  caching. Latency figures are demo benchmarks for relative comparison, not SLAs.
+* The subset ships no item titles or captions beyond the official title file, so
+  the UI identifies items by raw id and, where available, catalogue title.
+* Video features are wired through the architecture but the headline model uses
+  ID + text + image.
 
-## Reproducing the numbers
+## Repository Structure
 
-```bash
-python analysis/aggregate_results.py     # results/tables/*.csv from results/runs/
-python analysis/update_readme.py         # inject the tables into this README
-python analysis/plot_overall.py
-python analysis/plot_long_tail.py
-python analysis/plot_cold_start.py
-python scripts/export_gates.py --run-dir results/runs/<mm run>
-python analysis/analyze_gates.py
-python scripts/evaluate_recall.py
-python scripts/evaluate_pipeline.py
-python scripts/benchmark_latency.py
-python scripts/find_demo_user.py
-python scripts/capture_demo.py
 ```
-
-`python analysis/update_readme.py --check` fails if this README and
-`results/tables/*.csv` disagree.
+src/recall/       popular / itemcf / semantic channels + candidate merge
+src/rerank/       seen filter, dedup, zero-train exploration quota
+src/pipeline/     ranker registry + two-stage recommender
+src/models/       bpr, sasrec, mm_sasrec, item_encoder, fusion, rqvae, generative_rec
+src/data/         preprocessing, datasets, negative sampling, popularity, metadata
+src/evaluation/   metrics, full-ranking evaluator, cold/tail slicing
+src/training/     model factory, trainer (AMP, early stopping, checkpointing)
+src/retrieval/    exact inner-product index (Faiss, with numpy fallback)
+src/media/        verified id mapping + range-based archive extraction
+src/serving/      service, schemas, FastAPI app
+frontend/         React demo (Live Demo / Feed View / Inspector / Cold Start / System)
+scripts/          train, prepare_demo, prepare_media_demo, evaluate_*, capture_*
+analysis/         aggregation, plotting, gate analysis, README generation
+tests/            unit + integration tests
+docs/             data_schema, evaluation_protocol, media_provenance, design
+results/          runs/, tables/, figures/   (generated)
+artifacts/        indices, semantic IDs, demo manifests   (generated)
+```
