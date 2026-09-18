@@ -43,6 +43,7 @@ class RecommendResult:
     recommendations: list[dict]
     rerank: dict
     latency_ms: dict = field(default_factory=dict)
+    recall_channels: list[dict] = field(default_factory=list)
     target_item: int | None = None
     target_hit: bool | None = None
 
@@ -56,6 +57,7 @@ class RecommendResult:
             "final_k": self.final_k,
             "recall": self.recall_stats,
             "rerank": self.rerank,
+            "recall_channels": self.recall_channels,
             "latency_ms": self.latency_ms,
             "target_item": self.target_item,
             "target_hit": self.target_hit,
@@ -147,9 +149,11 @@ class TwoStageRecommender:
         ranker_name = ranker or self.default_ranker
         hist = self.history(user_id)
 
+        recall_trace: dict = {}
         merged = self.merger.recall_and_merge(
             user_id=int(user_id), history=hist,
             per_source_k=recall_k, total_k=max_candidates, sources=sources,
+            trace=recall_trace,
         )
         t_recall = time.perf_counter()
 
@@ -160,7 +164,7 @@ class TwoStageRecommender:
         t_rank = time.perf_counter()
 
         entries = self._entries(hist, candidate_ids, scores, merged, ranker_name)
-        cfg = RerankConfig(cold_exploration=cold_exploration, cold_quota=cold_quota)
+        cfg = RerankConfig(exploration=cold_exploration, exploration_quota=cold_quota)
         rr = rerank(entries, cfg, final_k=final_k, history=set(hist))
         t_end = time.perf_counter()
 
@@ -170,6 +174,16 @@ class TwoStageRecommender:
             user_id=int(user_id), history=hist, history_mode=self.history_mode,
             ranker=ranker_name, recall_k=recall_k, final_k=final_k,
             recall_stats=merged.stats, recommendations=rr.items, rerank=rr.applied,
+            recall_channels=[
+                {
+                    "name": name,
+                    "recalled": merged.stats["per_source"].get(name, 0),
+                    "in_pool": merged.stats["source_coverage_in_pool"].get(name, 0),
+                    "unique_contribution": merged.stats["unique_contribution"].get(name, 0),
+                    "latency_ms": merged.stats.get("per_source_latency_ms", {}).get(name),
+                }
+                for name in self.merger.source_names
+            ],
             latency_ms={
                 "recall": round((t_recall - t0) * 1000, 2),
                 "rank": round((t_rank - t_recall) * 1000, 2),
@@ -195,7 +209,10 @@ class TwoStageRecommender:
                 "sources": cand.source_names,
                 "source_trace": cand.sources,
                 "recall_rank": {s["name"]: s["rank"] for s in cand.sources},
-                "is_cold": meta.is_cold,
+                "is_cold": meta.is_simulated_cold,
+                "is_simulated_cold": meta.is_simulated_cold,
+                "is_zero_train_signal": meta.is_zero_train_signal,
+                "exploration_candidate": meta.exploration_candidate,
                 "popularity_bucket": meta.popularity_bucket,
                 "train_interactions": meta.train_interactions,
             })
@@ -219,9 +236,10 @@ class TwoStageRecommender:
         t0 = time.perf_counter()
         ranker_name = ranker or self.default_ranker
         hist = self.history(user_id)
+        recall_trace: dict = {}
         merged = self.merger.recall_and_merge(
             user_id=int(user_id), history=hist,
-            per_source_k=recall_k, total_k=max_candidates,
+            per_source_k=recall_k, total_k=max_candidates, trace=recall_trace,
         )
         candidate_ids = merged.item_ids()
         model = self.registry.get(ranker_name)
@@ -258,22 +276,36 @@ class TwoStageRecommender:
                 })
 
         target = self.target(user_id)
+        merger_names = list(self.merger.source_names)
         top_entries = entries[:top_n]
         moved_up, moved_down = [], []
         if compare_scores is not None:
-            ranked_by_base = sorted(entries, key=lambda e: -(e.get("compare_score") or -1e30))
-            base_pos = {int(e["item_id"]): i for i, e in enumerate(ranked_by_base)}
-            for i, e in enumerate(entries):
-                delta = i - base_pos[int(e["item_id"])]
-                if delta <= -5:
-                    moved_up.append({**e, "position_delta": -delta})
-                elif delta >= 5:
-                    moved_down.append({**e, "position_delta": delta})
+            # NB: `e["compare_score"] or -1e30` would be wrong -- 0.0 is a legal
+            # score and would be treated as missing.  Compare against None.
+            def _base_key(e: dict) -> float:
+                v = e.get("compare_score")
+                return -1e30 if v is None else -float(v)
 
-        rr = rerank(entries, RerankConfig(cold_exploration=cold_exploration),
+            ranked_by_base = sorted(entries, key=_base_key)
+            base_pos = {int(e["item_id"]): i + 1 for i, e in enumerate(ranked_by_base)}
+            # every candidate gets its baseline position and rank delta, so the
+            # UI can show movement on the served cards, not only on the extremes
+            for i, e in enumerate(entries, start=1):
+                pos = base_pos[int(e["item_id"])]
+                e["baseline_position"] = pos
+                e["rank_delta"] = pos - i  # positive = moved up
+            for i, e in enumerate(entries, start=1):
+                delta = base_pos[int(e["item_id"])] - i
+                if delta >= 5:
+                    moved_up.append({**e, "position_delta": delta})
+                elif delta <= -5:
+                    moved_down.append({**e, "position_delta": -delta})
+
+        rr = rerank(entries, RerankConfig(exploration=cold_exploration),
                     final_k=20, history=set(hist))
 
-        merged.stats["cold_in_pool"] = sum(1 for e in entries if e["is_cold"])
+        merged.stats["exploration_in_pool"] = sum(
+            1 for e in entries if e.get("exploration_candidate"))
 
         return {
             "user_id": int(user_id),
@@ -284,6 +316,18 @@ class TwoStageRecommender:
             "ranker": ranker_name,
             "compare_ranker": compare,
             "recall_summary": {**merged.stats, "candidates_ranked": len(candidate_ids)},
+            "recall_channels": [
+                {
+                    "name": name,
+                    "recalled": merged.stats["per_source"].get(name, 0),
+                    "in_pool": merged.stats["source_coverage_in_pool"].get(name, 0),
+                    "unique_contribution": merged.stats["unique_contribution"].get(name, 0),
+                    "latency_ms": merged.stats.get("per_source_latency_ms", {}).get(name),
+                    "target_hit": target in {c.item_id for c in merged.candidates
+                                             if name in c.source_names},
+                }
+                for name in merger_names
+            ],
             "recall_candidates": [c.as_dict() for c in merged.candidates[:top_n]],
             "top_candidates": top_entries,
             "baseline_top": baseline_top,

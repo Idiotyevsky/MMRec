@@ -1,7 +1,7 @@
 // Response types mirroring src/serving/schemas.py.
 // Item ids are raw MicroLens ids everywhere in the UI.
 
-export type Bucket = "head" | "middle" | "tail" | "cold" | "unknown";
+export type Bucket = "head" | "middle" | "tail" | "simulated_cold" | "cold" | "unknown";
 
 export interface SourceTrace {
   name: string;
@@ -14,33 +14,54 @@ export interface HistoryItem {
   item_id: number;
   popularity_bucket: Bucket;
   is_cold: boolean;
+  is_simulated_cold?: boolean;
+  is_zero_train_signal?: boolean;
+  exploration_candidate?: boolean;
   train_interactions: number;
 }
 
 export interface RecommendationItem {
   item_id: number;
   ranking_score: number;
-  // present on the inspect endpoint (the recall merge score), absent on /recommend
-  merge_score?: number;
   final_rank: number;
+  merge_score?: number;
   sources: string[];
+  source_trace?: SourceTrace[];
   recall_rank: Record<string, number>;
   is_cold: boolean;
+  is_simulated_cold?: boolean;
+  is_zero_train_signal?: boolean;
+  exploration_candidate?: boolean;
+  exploration: boolean;
   popularity_bucket: Bucket;
   train_interactions: number;
-  exploration: boolean;
   compare_score?: number | null;
   score_delta?: number | null;
+  /** position in the baseline ranking of the same pool (inspect only) */
+  baseline_position?: number | null;
+  rank_delta?: number | null;
+  position_delta?: number;
+}
+
+export interface RecallChannelTrace {
+  name: string;
+  recalled: number;
+  in_pool: number;
+  unique_contribution: number;
+  latency_ms: number | null;
+  target_hit: boolean | null;
 }
 
 export interface RecallStats {
   per_source: Record<string, number>;
+  unique_contribution: Record<string, number>;
   before_dedup: number;
   after_dedup: number;
   duplicates_removed: number;
   candidates_ranked: number;
-  cold_in_pool: number;
+  exploration_in_pool: number;
   source_coverage_in_pool: Record<string, number>;
+  per_source_latency_ms: Record<string, number>;
 }
 
 export interface RecommendResponse {
@@ -51,7 +72,9 @@ export interface RecommendResponse {
   recall_k: number;
   final_k: number;
   recall: RecallStats;
+  recall_channels: RecallChannelTrace[];
   rerank: Record<string, unknown>;
+  exploration: Record<string, unknown>;
   latency_ms: { recall?: number; rank?: number; rerank?: number; total: number };
   target_item: number | null;
   target_hit: boolean | null;
@@ -76,6 +99,8 @@ export interface RecallResponse {
     merge_score: number;
     popularity_bucket: Bucket;
     is_cold: boolean;
+    is_zero_train_signal?: boolean;
+    exploration_candidate?: boolean;
     train_interactions: number;
   }[];
 }
@@ -86,6 +111,13 @@ export interface ModelInfo {
   run_dir: string | null;
   tag?: string;
   offline: Record<string, number>;
+}
+
+export interface ExplorationSummary {
+  serving_zero_train_items: number;
+  serving_exploration_candidates: number;
+  benchmark_simulated_cold_items: number;
+  note: string;
 }
 
 export interface SystemResponse {
@@ -104,7 +136,9 @@ export interface SystemResponse {
     has_cold_split: boolean;
     cold_items: number;
     zero_train_frequency_items: number;
+    exploration_candidates: number;
   };
+  exploration?: ExplorationSummary;
   history_mode: string;
 }
 
@@ -118,6 +152,7 @@ export interface InspectResponse {
   ranker: string;
   compare_ranker: string | null;
   recall_summary: RecallStats;
+  recall_channels: RecallChannelTrace[];
   recall_candidates: {
     item_id: number;
     sources: SourceTrace[];
@@ -145,6 +180,8 @@ export interface ColdItem {
   item_id: number;
   train_interactions: number;
   is_cold: boolean;
+  is_simulated_cold?: boolean;
+  is_zero_train_signal?: boolean;
   popularity_bucket: Bucket;
   content_available: Record<string, boolean>;
   content_similar: {
@@ -159,7 +196,6 @@ export interface ColdExperiment {
   model: string;
   kind: string;
   modalities: string;
-  // the API keys contain '@', so they must be quoted
   "cold_recall@10": number | null;
   "cold_recall@20": number | null;
   "cold_only_recall@10": number | null;
@@ -170,6 +206,19 @@ export interface ColdSummary {
   dataset: string;
   num_cold_items: number;
   num_users_with_cold_target: number;
+  serving_zero_train_items: number;
   experiments: ColdExperiment[];
   note: string;
+}
+
+export interface EvaluationResponse {
+  recall_by_budget: {
+    ks: number[];
+    channels: { channel: string; values: (number | null)[] }[];
+    num_users: number | null;
+  };
+  pipeline_tradeoff: Record<string, number | string | null>[];
+  latency: Record<string, number | string | null>[];
+  source_contribution: Record<string, number | string | null>[];
+  notes: Record<string, string>;
 }

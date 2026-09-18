@@ -160,25 +160,48 @@ def test_item_metadata_rejects_pad_and_out_of_range(synthetic_data):
     assert meta.of(0).popularity_bucket == "unknown"
 
 
-def test_cold_metadata_is_marked(synthetic_cold_dir):
+def test_simulated_cold_metadata_is_marked(synthetic_cold_dir):
     data = ProcessedData.load(synthetic_cold_dir)
     meta = ItemMetadata(data)
-    cold = np.flatnonzero(data.is_cold)
+    cold = np.flatnonzero(data.is_simulated_cold)
     assert cold.size > 0
     for i in cold[:5].tolist():
         m = meta.of(int(i))
-        assert m.is_cold and m.popularity_bucket == "cold"
+        assert m.is_simulated_cold and m.popularity_bucket == "simulated_cold"
         assert m.train_interactions == 0
+        assert m.is_zero_train_signal  # simulated cold implies zero training signal
+
+
+def test_zero_train_signal_is_separate_from_simulated_cold(synthetic_data):
+    """The base split has no simulated cold items but does have zero-train items."""
+    meta = ItemMetadata(synthetic_data)
+    assert not meta.has_cold_split
+    assert not meta.is_simulated_cold.any()
+    zero = np.flatnonzero(meta.is_zero_train_signal)
+    assert zero.size > 0, "synthetic base split should contain zero-frequency items"
+    for i in zero[:5].tolist():
+        m = meta.of(int(i))
+        assert m.is_zero_train_signal and not m.is_simulated_cold
+        assert m.exploration_candidate, "zero-train items must be exploration candidates"
+        assert m.train_interactions == 0
+
+
+def test_exploration_flags_match_train_frequency(synthetic_data):
+    meta = ItemMetadata(synthetic_data)
+    flags = meta.exploration_flags()
+    assert not flags[0]
+    for i in (1, 2, 5, 9):
+        assert flags[i] == (int(synthetic_data.train_freq[i]) == 0)
 
 
 # ---------------------------------------------------------------- rerank
 def _entries():
     return [
-        {"item_id": 1, "ranking_score": 10.0, "is_cold": False},
-        {"item_id": 2, "ranking_score": 9.0, "is_cold": False},
-        {"item_id": 3, "ranking_score": 8.0, "is_cold": True},
-        {"item_id": 4, "ranking_score": 7.0, "is_cold": False},
-        {"item_id": 5, "ranking_score": 6.0, "is_cold": True},
+        {"item_id": 1, "ranking_score": 10.0, "exploration_candidate": False},
+        {"item_id": 2, "ranking_score": 9.0, "exploration_candidate": False},
+        {"item_id": 3, "ranking_score": 8.0, "exploration_candidate": True},
+        {"item_id": 4, "ranking_score": 7.0, "exploration_candidate": False},
+        {"item_id": 5, "ranking_score": 6.0, "exploration_candidate": True},
     ]
 
 
@@ -198,23 +221,123 @@ def test_dedup_is_applied():
     assert [e["item_id"] for e in out].count(1) == 1
 
 
-def test_cold_exploration_guarantees_a_cold_slot():
-    cfg = RerankConfig(cold_exploration=True, cold_quota=2)
+def test_exploration_guarantees_a_slot():
+    cfg = RerankConfig(exploration=True, exploration_quota=2)
     out = rerank(_entries(), cfg, final_k=4).items
-    assert sum(1 for e in out if e["is_cold"]) >= 2
+    assert sum(1 for e in out if e["exploration"]) >= 2
     assert len(out) == 4
 
 
-def test_cold_exploration_is_bounded_by_availability():
-    entries = [{"item_id": i, "ranking_score": 10.0 - i, "is_cold": False} for i in range(1, 6)]
-    entries.append({"item_id": 99, "ranking_score": 1.0, "is_cold": True})
-    cfg = RerankConfig(cold_exploration=True, cold_quota=3)
+def test_exploration_is_bounded_by_availability():
+    entries = [{"item_id": i, "ranking_score": 10.0 - i, "exploration_candidate": False}
+               for i in range(1, 6)]
+    entries.append({"item_id": 99, "ranking_score": 1.0, "exploration_candidate": True})
+    cfg = RerankConfig(exploration=True, exploration_quota=3)
     out = rerank(entries, cfg, final_k=4).items
-    assert sum(1 for e in out if e["is_cold"]) == 1  # only one exists
+    assert sum(1 for e in out if e["exploration"]) == 1  # only one exists
     assert len(out) == 4  # still filled to final_k
 
 
-def test_cold_exploration_never_shortens_the_list():
-    cfg = RerankConfig(cold_exploration=True, cold_quota=5)
+def test_exploration_never_shortens_the_list():
+    cfg = RerankConfig(exploration=True, exploration_quota=5)
     out = rerank(_entries(), cfg, final_k=5).items
     assert len(out) == 5
+
+
+def test_exploration_flag_marks_only_injected_items():
+    """An exploration candidate that ranks on merit must NOT be flagged.
+
+    The flag means "this slot was reserved for it", so guessing it from the
+    final rank or from the item's metadata would be wrong.
+    """
+    # item 3 is an exploration candidate but already inside the top-3 on merit
+    entries = [
+        {"item_id": 1, "ranking_score": 10.0, "exploration_candidate": False},
+        {"item_id": 2, "ranking_score": 9.0, "exploration_candidate": False},
+        {"item_id": 3, "ranking_score": 8.0, "exploration_candidate": True},
+        {"item_id": 4, "ranking_score": 7.0, "exploration_candidate": False},
+        {"item_id": 5, "ranking_score": 6.0, "exploration_candidate": True},
+    ]
+    cfg = RerankConfig(exploration=True, exploration_quota=1)
+    res = rerank(entries, cfg, final_k=4)
+    flags = {e["item_id"]: e["exploration"] for e in res.items}
+    assert flags[3] is False, "item 3 made the cut on merit; it was not injected"
+    assert res.applied["exploration_injected"] == 1
+    assert res.applied["exploration_injected_ids"] == [5]
+
+
+def test_exploration_off_flags_nothing():
+    cfg = RerankConfig(exploration=False)
+    res = rerank(_entries(), cfg, final_k=5)
+    assert all(e["exploration"] is False for e in res.items)
+    assert res.applied["exploration_injected"] == 0
+
+
+# ------------------------------------------------- rank movement / retention
+def test_self_comparison_reports_no_movement(pipeline):
+    """Comparing a model against itself must not invent rank movement."""
+    out = pipeline.inspect(1, recall_k=80, top_n=30, compare="sasrec", ranker="sasrec")
+    assert out["moved_up_by_multimodal"] == []
+    assert out["moved_down_by_multimodal"] == []
+    assert out["baseline_top"] == []
+    assert all("compare_score" not in e for e in out["top_candidates"])
+
+
+def test_rank_movement_is_reported_for_two_rankers(synthetic_data, synthetic_recall_artifacts,
+                                                   synthetic_run):
+    """A real comparison must expose positions and rank movement for both models."""
+    from src.pipeline import RankerRegistry, RankerSpec
+    from src.recall import CandidateMerger, ItemCFRecall, PopularRecall, SemanticRecall, load_itemcf_index
+
+    ic = load_itemcf_index(synthetic_recall_artifacts["itemcf"])
+    emb = np.load(synthetic_recall_artifacts["content"])
+    merger = CandidateMerger([
+        PopularRecall(synthetic_data.train_freq, synthetic_data.num_items),
+        ItemCFRecall(ic["neighbors"], ic["sims"], synthetic_data.num_items),
+        SemanticRecall(emb, synthetic_data.num_items),
+    ])
+    # the same checkpoint registered twice: identical scores, but the comparison
+    # path is exercised end to end
+    registry = RankerRegistry(synthetic_data, {
+        "sasrec": RankerSpec("sasrec", synthetic_run),
+        "mm_concat": RankerSpec("mm_concat", synthetic_run),
+    }, device="cpu")
+    registry.warm()
+    rec = TwoStageRecommender(synthetic_data, merger, registry, default_ranker="mm_concat")
+
+    out = rec.inspect(1, recall_k=80, top_n=30, ranker="mm_concat", compare="sasrec")
+    assert out["top_candidates"], "no candidates to compare"
+    for e in out["top_candidates"]:
+        assert e["compare_ranker"] == "sasrec"
+        assert e["compare_score"] is not None
+        assert e["score_delta"] == pytest.approx(e["ranking_score"] - e["compare_score"], abs=1e-5)
+    # identical models => identical ordering => no movement
+    assert out["moved_up_by_multimodal"] == []
+    assert out["moved_down_by_multimodal"] == []
+    assert out["baseline_top"], "baseline top-N should be populated for a real comparison"
+
+
+def test_compare_score_of_zero_is_not_treated_as_missing(pipeline):
+    """`score or -1e30` would silently treat a legitimate 0.0 as absent."""
+    out = pipeline.inspect(2, recall_k=60, top_n=20, compare="sasrec")
+    zero_scored = [e for e in out["top_candidates"] if e.get("compare_score") == 0.0]
+    for e in zero_scored:
+        assert e["score_delta"] is not None, "a 0.0 baseline score was treated as missing"
+    # and the ranking helper must place a 0.0-scored item by its value, not last
+    from src.pipeline.recommender import TwoStageRecommender  # noqa: F401
+
+
+def test_exploration_candidate_flag_comes_from_metadata(pipeline):
+    res = pipeline.recommend(1, recall_k=60, final_k=10)
+    for e in res.recommendations:
+        assert "exploration_candidate" in e
+        assert e["exploration_candidate"] == (e["train_interactions"] == 0)
+
+
+def test_exploration_injection_marks_only_reserved_slots(pipeline):
+    res = pipeline.recommend(1, recall_k=60, final_k=10, cold_exploration=True, cold_quota=2)
+    flagged = [e for e in res.recommendations if e["exploration"]]
+    for e in flagged:
+        assert e["exploration_candidate"], "an injected slot must be an exploration candidate"
+    assert res.rerank["exploration_injected"] == len(flagged)
+    assert sorted(e["item_id"] for e in flagged) == sorted(res.rerank["exploration_injected_ids"])

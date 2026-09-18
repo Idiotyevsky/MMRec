@@ -1,10 +1,28 @@
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../api/client";
 import type { InspectResponse, SystemResponse } from "../api/types";
-import { Badge, Bars, BucketBadge, ColdBadge, ErrorBox, Panel, Stat, fmt, num } from "../components/common";
+import { Badge, Bars, BucketBadge, ErrorBox, Panel, fmt, num } from "../components/common";
+import { SOURCE_COLORS, SOURCE_LABEL } from "../components/PipelineFlow";
 import { UserPicker } from "../components/UserPicker";
 
-type SortKey = "merge_score" | "ranking_score" | "compare_score" | "score_delta" | "item_id";
+type SortKey =
+  | "merge_score" | "ranking_score" | "compare_score" | "score_delta"
+  | "item_id" | "baseline_position" | "rank_delta";
+
+/** One node of the traced path for a single item. */
+function TraceNode({
+  label, value, note, state,
+}: {
+  label: string; value: string; note?: string; state?: "hit" | "miss";
+}) {
+  return (
+    <div className={`trace-node${state ? ` ${state}` : ""}`}>
+      <div className="lbl">{label}</div>
+      <div className="val">{value}</div>
+      {note && <div className="note">{note}</div>}
+    </div>
+  );
+}
 
 export default function Inspector() {
   const [system, setSystem] = useState<SystemResponse | null>(null);
@@ -12,6 +30,7 @@ export default function Inspector() {
   const [ranker, setRanker] = useState("mm_concat");
   const [compare, setCompare] = useState("sasrec");
   const [data, setData] = useState<InspectResponse | null>(null);
+  const [selected, setSelected] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<unknown>(null);
   const [sortKey, setSortKey] = useState<SortKey>("ranking_score");
@@ -25,8 +44,11 @@ export default function Inspector() {
     setLoading(true);
     setError(null);
     api
-      .inspect(userId, { ranker, compare, recall_k: 200, top_n: 40 })
-      .then(setData)
+      .inspect(userId, { ranker, compare, recall_k: 200, top_n: 60 })
+      .then((res) => {
+        setData(res);
+        setSelected(res.final_top_k[0]?.item_id ?? res.top_candidates[0]?.item_id ?? null);
+      })
       .catch(setError)
       .finally(() => setLoading(false));
   }, [userId, ranker, compare]);
@@ -44,26 +66,39 @@ export default function Inspector() {
 
   const toggleSort = (k: SortKey) => {
     if (k === sortKey) setSortDesc(!sortDesc);
-    else {
-      setSortKey(k);
-      setSortDesc(true);
-    }
+    else { setSortKey(k); setSortDesc(true); }
   };
-
   const head = (label: string, k: SortKey) => (
     <th onClick={() => toggleSort(k)}>
       {label} {sortKey === k ? (sortDesc ? "▾" : "▴") : ""}
     </th>
   );
 
+  const picked = useMemo(() => {
+    if (!data || selected === null) return null;
+    const entry = data.top_candidates.find((e) => e.item_id === selected);
+    if (!entry) return null;
+    // Use the candidate's own source trace, not `recall_candidates` (which is
+    // only a preview of the first N pool entries and would show "—" for any
+    // item outside it even though the channel did recall it).
+    const trace = entry.source_trace ?? [];
+    const rankOf = (name: string): number | null => {
+      const t = trace.find((s) => s.name === name);
+      if (t) return t.rank;
+      const r = entry.recall_rank?.[name];
+      return r === undefined ? null : r;
+    };
+    const finalRank = data.final_top_k.findIndex((e) => e.item_id === selected) + 1;
+    return { entry, rankOf, finalRank: finalRank > 0 ? finalRank : null };
+  }, [data, selected]);
+
   return (
     <>
       <div className="page-head">
         <h1>Recommendation Inspector</h1>
         <p>
-          The full request trace for one user: which channels recalled each candidate, how the pool
-          was merged, what the ranker scored it, and what the multimodal model changed relative to
-          the ID-only baseline.
+          Why is this item recommended? Pick any candidate and follow it from the recall
+          channels through the merge and both rankers to its final position.
         </p>
       </div>
 
@@ -76,14 +111,13 @@ export default function Inspector() {
           <label className="field">
             Ranker
             <select value={ranker} onChange={(e) => setRanker(e.target.value)}>
-              {system?.rankers.map((m) => (
-                <option key={m.name} value={m.name}>{m.name}</option>
-              ))}
+              {system?.rankers.map((m) => <option key={m.name} value={m.name}>{m.name}</option>)}
             </select>
           </label>
           <label className="field">
             Compare against
             <select value={compare} onChange={(e) => setCompare(e.target.value)}>
+              <option value="">none</option>
               {system?.rankers.filter((m) => m.name !== ranker).map((m) => (
                 <option key={m.name} value={m.name}>{m.name}</option>
               ))}
@@ -96,55 +130,142 @@ export default function Inspector() {
 
       {data && !loading && (
         <>
-          {/* ---------- pipeline ---------- */}
-          <Panel title="Pipeline" note={`history mode: ${data.history_mode} · latency ${data.latency_ms.total} ms`}>
-            <div className="pipe">
-              <div className="stage">
-                <div className="t">History</div>
-                <div className="n">{data.history_length}</div>
-                <div className="small faint">items</div>
-              </div>
-              <div className="arrow">→</div>
-              <div className="stage">
-                <div className="t">Recalled</div>
-                <div className="n">{num(data.recall_summary.before_dedup)}</div>
-                <div className="small faint">
-                  {Object.entries(data.recall_summary.per_source ?? {})
-                    .map(([k, v]) => `${k} ${v}`)
-                    .join(" · ")}
-                </div>
-              </div>
-              <div className="arrow">→</div>
-              <div className="stage">
-                <div className="t">After dedup</div>
-                <div className="n">{num(data.recall_summary.after_dedup)}</div>
-                <div className="small faint">{num(data.recall_summary.duplicates_removed)} merged</div>
-              </div>
-              <div className="arrow">→</div>
-              <div className="stage">
-                <div className="t">Ranked</div>
-                <div className="n">{num(data.recall_summary.candidates_ranked)}</div>
-                <div className="small faint">{ranker}</div>
-              </div>
-              <div className="arrow">→</div>
-              <div className="stage">
-                <div className="t">Served</div>
-                <div className="n">{data.final_top_k.length}</div>
-                <div className="small faint">
-                  target {data.target_item !== null ? `#${data.target_item}` : "—"}
-                </div>
-              </div>
+          {/* ---------- trace-first view ---------- */}
+          <Panel
+            title="Recommendation trace"
+            right={
+              <span className="small faint">
+                {data.recall_summary.candidates_ranked} candidates ranked
+              </span>
+            }
+          >
+            <div className="row" style={{ gap: 6, marginBottom: 14 }}>
+              <span className="small muted">Pick a served item:</span>
+              {data.final_top_k.slice(0, 12).map((e) => (
+                <button
+                  key={e.item_id}
+                  className={selected === e.item_id ? "primary" : ""}
+                  onClick={() => setSelected(e.item_id)}
+                >
+                  #{e.item_id}
+                </button>
+              ))}
             </div>
+
+            {picked && (
+              <>
+                <div className="trace">
+                  {(["popular", "itemcf", "semantic"] as const).map((name) => {
+                    const r = picked.rankOf(name);
+                    return (
+                      <div key={name} style={{ display: "contents" }}>
+                        <TraceNode
+                          label={name.toUpperCase()}
+                          value={r === null ? "—" : `#${r}`}
+                          state={r === null ? "miss" : "hit"}
+                        />
+                        <div className="trace-arrow">→</div>
+                      </div>
+                    );
+                  })}
+                  <TraceNode label="MERGE" value={fmt(picked.entry.merge_score, 4)} note="RRF score" />
+                  <div className="trace-arrow">→</div>
+                  <TraceNode
+                    label={`${(data.compare_ranker ?? "baseline").toUpperCase()}`}
+                    value={picked.entry.baseline_position ? `#${picked.entry.baseline_position}` : "—"}
+                    note={picked.entry.compare_score !== null && picked.entry.compare_score !== undefined
+                      ? `score ${fmt(picked.entry.compare_score, 3)}` : undefined}
+                  />
+                  <div className="trace-arrow">→</div>
+                  <TraceNode
+                    label={`${data.ranker.toUpperCase()}`}
+                    value={`#${rows.findIndex((r) => r.item_id === picked.entry.item_id) + 1}`}
+                    note={`score ${fmt(picked.entry.ranking_score, 3)}`}
+                    state="hit"
+                  />
+                  <div className="trace-arrow">→</div>
+                  <TraceNode
+                    label="FINAL"
+                    value={picked.finalRank ? `#${picked.finalRank}` : "—"}
+                    note={picked.finalRank ? "served" : "in pool, not served"}
+                    state={picked.finalRank ? "hit" : "miss"}
+                  />
+                </div>
+
+                <div className="grid cols-4" style={{ marginTop: 16 }}>
+                  <div className="stat">
+                    <div className="k">Rank movement</div>
+                    <div className="v" style={{
+                      color: (picked.entry.rank_delta ?? 0) > 0 ? "var(--ok)"
+                        : (picked.entry.rank_delta ?? 0) < 0 ? "var(--warn)" : undefined,
+                    }}>
+                      {picked.entry.rank_delta === null || picked.entry.rank_delta === undefined
+                        ? "—"
+                        : `${picked.entry.baseline_position} → ${rows.findIndex((r) => r.item_id === picked.entry.item_id) + 1}`}
+                    </div>
+                    <div className="s">
+                      {picked.entry.rank_delta === null || picked.entry.rank_delta === undefined
+                        ? "no baseline selected"
+                        : picked.entry.rank_delta > 0
+                          ? `↑ ${picked.entry.rank_delta} positions with multimodal`
+                          : picked.entry.rank_delta < 0
+                            ? `↓ ${-picked.entry.rank_delta} positions with multimodal`
+                            : "unchanged"}
+                    </div>
+                  </div>
+                  <div className="stat">
+                    <div className="k">Recall sources</div>
+                    <div className="v" style={{ fontSize: 15 }}>
+                      {picked.entry.sources.map((s) => (
+                        <Badge key={s} kind="src">{SOURCE_LABEL[s] ?? s}</Badge>
+                      ))}
+                    </div>
+                    <div className="s">
+                      {picked.entry.sources.length > 1
+                        ? "found by several channels"
+                        : "found by a single channel"}
+                    </div>
+                  </div>
+                  <div className="stat">
+                    <div className="k">Popularity</div>
+                    <div className="v" style={{ fontSize: 17 }}>
+                      <BucketBadge bucket={picked.entry.popularity_bucket} />
+                    </div>
+                    <div className="s">{num(picked.entry.train_interactions)} training interactions</div>
+                  </div>
+                  <div className="stat">
+                    <div className="k">Status</div>
+                    <div className="v" style={{ fontSize: 17 }}>
+                      {picked.entry.is_zero_train_signal
+                        ? <Badge kind="cold">zero-train</Badge>
+                        : <Badge kind="plain">warm</Badge>}
+                    </div>
+                    <div className="s">
+                      {picked.entry.is_zero_train_signal
+                        ? "no collaborative signal available"
+                        : "collaborative signal available"}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="note mt">
+                  Raw scores from two different models are not on a common scale, so the
+                  primary comparison here is <strong>rank movement inside the same candidate
+                  pool</strong>. Score deltas are shown for completeness only.
+                </div>
+              </>
+            )}
           </Panel>
 
+          {/* ---------- pipeline stages ---------- */}
           <div className="grid cols-2" style={{ marginTop: 16 }}>
             <div>
               <Panel title="Recall channels">
                 <Bars
-                  data={Object.entries(data.recall_summary.per_source ?? {}).map(([k, v]) => ({
-                    label: k,
-                    value: v,
-                    display: num(v),
+                  data={data.recall_channels.map((c) => ({
+                    label: SOURCE_LABEL[c.name] ?? c.name,
+                    value: c.recalled,
+                    display: num(c.recalled),
                   }))}
                 />
                 <div className="mt">
@@ -157,8 +278,8 @@ export default function Inspector() {
                   />
                 </div>
                 <div className="panel-note">
-                  Candidates per channel, then the merged pool. Duplicate items are merged, not
-                  dropped: every contributing channel is kept on the candidate.
+                  Duplicates are merged, not dropped: every channel that found an item stays
+                  on its source trace.
                 </div>
               </Panel>
 
@@ -176,18 +297,18 @@ export default function Inspector() {
             <div>
               <Panel
                 title={`What ${data.compare_ranker ?? "the baseline"} vs ${data.ranker} changed`}
-                note="Same candidate pool, same user. Only the ranker differs, so any movement is attributable to the multimodal item representation."
+                note="Same candidate pool, same user, same checkpoint family. Only the item representation differs, so any movement is attributable to it."
               >
-                <div className="grid cols-2" style={{ gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
                   <div>
                     <div className="panel-title">Moved up by multimodal</div>
                     {data.moved_up_by_multimodal.length === 0 && <div className="muted small">none</div>}
                     {data.moved_up_by_multimodal.map((e) => (
                       <div className="kv" key={e.item_id}>
-                        <span className="k">#{e.item_id}</span>
+                        <span className="k mono">#{e.item_id}</span>
                         <span className="v">
-                          <Badge kind="cold">+{e.position_delta}</Badge>{" "}
-                          <span className="faint">Δ{fmt(e.score_delta, 3)}</span>
+                          <Badge kind="cold">↑{e.position_delta}</Badge>{" "}
+                          <span className="faint">{e.sources.map((s) => SOURCE_LABEL[s] ?? s).join("+")}</span>
                         </span>
                       </div>
                     ))}
@@ -197,19 +318,14 @@ export default function Inspector() {
                     {data.moved_down_by_multimodal.length === 0 && <div className="muted small">none</div>}
                     {data.moved_down_by_multimodal.map((e) => (
                       <div className="kv" key={e.item_id}>
-                        <span className="k">#{e.item_id}</span>
+                        <span className="k mono">#{e.item_id}</span>
                         <span className="v">
-                          <Badge kind="tail">−{e.position_delta}</Badge>{" "}
-                          <span className="faint">Δ{fmt(e.score_delta, 3)}</span>
+                          <Badge kind="tail">↓{e.position_delta}</Badge>{" "}
+                          <span className="faint">{e.sources.map((s) => SOURCE_LABEL[s] ?? s).join("+")}</span>
                         </span>
                       </div>
                     ))}
                   </div>
-                </div>
-                <div className="panel-note">
-                  Position deltas compare the ranking of the two models inside the same candidate
-                  pool. They explain <em>what</em> the content features changed, which is the point
-                  of this page.
                 </div>
               </Panel>
 
@@ -217,25 +333,17 @@ export default function Inspector() {
                 <table>
                   <thead>
                     <tr>
-                      <th>Item</th>
-                      <th>Base rank</th>
-                      <th>Base score</th>
-                      <th>MM score</th>
-                      <th>Δ</th>
-                      <th>Bucket</th>
+                      <th>Item</th><th>Base rank</th><th>Base score</th>
+                      <th>MM score</th><th>Bucket</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {data.baseline_top.map((b) => (
+                    {data.baseline_top.slice(0, 12).map((b) => (
                       <tr key={b.item_id}>
                         <td className="mono">#{b.item_id}</td>
                         <td>{b.baseline_rank}</td>
                         <td>{fmt(b.baseline_score, 3)}</td>
                         <td>{fmt(b.multimodal_score, 3)}</td>
-                        <td style={{ color: b.delta >= 0 ? "var(--ok)" : "var(--warn)" }}>
-                          {b.delta >= 0 ? "+" : ""}
-                          {fmt(b.delta, 3)}
-                        </td>
                         <td><BucketBadge bucket={b.popularity_bucket} /></td>
                       </tr>
                     ))}
@@ -245,10 +353,10 @@ export default function Inspector() {
             </div>
           </div>
 
-          {/* ---------- candidate table ---------- */}
+          {/* ---------- full candidate table ---------- */}
           <Panel
             title="Candidate table"
-            note={`${rows.length} candidates ranked. Click a column header to sort. "Sources" shows every channel that recalled the item, with its rank inside that channel.`}
+            note={`${rows.length} candidates ranked. Click a header to sort. "Sources" shows every channel that recalled the item, with its rank inside that channel.`}
           >
             <div style={{ maxHeight: 520, overflow: "auto" }}>
               <table>
@@ -260,57 +368,47 @@ export default function Inspector() {
                     {head("Merge", "merge_score")}
                     {head("Rank score", "ranking_score")}
                     {head("Baseline", "compare_score")}
-                    {head("Δ", "score_delta")}
+                    {head("Base pos", "baseline_position")}
+                    {head("Δ rank", "rank_delta")}
                     <th>Bucket</th>
                     <th>Status</th>
                   </tr>
                 </thead>
                 <tbody>
                   {rows.map((c) => (
-                    <tr key={c.item_id}>
+                    <tr key={c.item_id}
+                        onClick={() => setSelected(c.item_id)}
+                        style={{ cursor: "pointer" }}>
                       <td className="mono">#{c.item_id}</td>
                       <td>
                         {c.sources.map((s) => (
-                          <Badge key={s} kind="src">{s}</Badge>
+                          <span key={s} className="badge src"
+                                style={{ borderLeft: `3px solid ${SOURCE_COLORS[s] ?? "#999"}` }}>
+                            {SOURCE_LABEL[s] ?? s}
+                          </span>
                         ))}
                       </td>
                       <td className="small muted">
-                        {Object.entries(c.recall_rank ?? {})
-                          .map(([k, v]) => `${k}:${v}`)
-                          .join(" ")}
+                        {Object.entries(c.recall_rank ?? {}).map(([k, v]) => `${k}:${v}`).join(" ")}
                       </td>
-                      <td>{fmt(c.merge_score, 4)}</td>
+                      <td>{fmt(c.merge_score ?? null, 4)}</td>
                       <td>{fmt(c.ranking_score, 3)}</td>
                       <td className="muted">{fmt(c.compare_score ?? null, 3)}</td>
-                      <td style={{ color: (c.score_delta ?? 0) >= 0 ? "var(--ok)" : "var(--warn)" }}>
-                        {c.score_delta === null || c.score_delta === undefined
+                      <td className="muted">{c.baseline_position ?? "—"}</td>
+                      <td style={{
+                        color: (c.rank_delta ?? 0) > 0 ? "var(--ok)"
+                          : (c.rank_delta ?? 0) < 0 ? "var(--warn)" : undefined,
+                      }}>
+                        {c.rank_delta === null || c.rank_delta === undefined
                           ? "—"
-                          : `${c.score_delta >= 0 ? "+" : ""}${fmt(c.score_delta, 3)}`}
+                          : `${c.rank_delta > 0 ? "+" : ""}${c.rank_delta}`}
                       </td>
                       <td><BucketBadge bucket={c.popularity_bucket} /></td>
-                      <td><ColdBadge cold={c.is_cold} /></td>
+                      <td>{c.is_zero_train_signal ? <Badge kind="cold">zero-train</Badge> : <Badge kind="plain">warm</Badge>}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
-            </div>
-          </Panel>
-
-          <Panel title={`Served top-${data.final_top_k.length}`}>
-            <div className="grid cols-4">
-              {data.final_top_k.map((r) => (
-                <Stat
-                  key={r.item_id}
-                  label={`#${r.final_rank} · item ${r.item_id}`}
-                  value={fmt(r.ranking_score, 3)}
-                  sub={
-                    <>
-                      {r.sources.join(" + ")} · {r.popularity_bucket}
-                      {r.is_cold ? " · cold" : ""}
-                    </>
-                  }
-                />
-              ))}
             </div>
           </Panel>
         </>

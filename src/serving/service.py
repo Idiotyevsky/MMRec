@@ -111,7 +111,7 @@ class ShortRecService:
         else:
             LOG.warning(f"cold dataset missing at {cold_path}; /cold endpoints degraded")
             self.cold_metadata = None
-        self._cold_ids = (np.flatnonzero(self.cold_data.is_cold)
+        self._cold_ids = (np.flatnonzero(self.cold_data.is_simulated_cold)
                           if self.cold_data is not None else np.zeros(0, dtype=np.int64))
         self._feature_dir = self.root / feature_dir
 
@@ -153,6 +153,7 @@ class ShortRecService:
             "recall_sources": info["recall_sources"],
             "recall_readiness": readiness,
             "item_metadata": info["item_metadata"],
+            "exploration": self.exploration_summary(),
             "history_mode": info["history_mode"],
         }
 
@@ -181,12 +182,16 @@ class ShortRecService:
                 "sources": c.sources,
                 "merge_score": float(c.merge_score),
                 "popularity_bucket": meta.popularity_bucket,
-                "is_cold": meta.is_cold,
+                "is_cold": meta.is_simulated_cold,
+                "is_simulated_cold": meta.is_simulated_cold,
+                "is_zero_train_signal": meta.is_zero_train_signal,
+                "exploration_candidate": meta.exploration_candidate,
                 "train_interactions": meta.train_interactions,
             })
         stats = dict(merged.stats)
         stats["candidates_ranked"] = len(merged.candidates)
-        stats["cold_in_pool"] = sum(1 for c in merged.candidates if self.metadata.of(c.item_id).is_cold)
+        stats["exploration_in_pool"] = sum(
+            1 for c in merged.candidates if self.metadata.of(c.item_id).exploration_candidate)
         coverage: dict[str, int] = {}
         for c in merged.candidates:
             for name in c.source_names:
@@ -212,6 +217,7 @@ class ShortRecService:
             max_candidates=max_candidates, sources=sources,
         )
         out = res.as_dict()
+        out["exploration"] = res.rerank
         out["history"] = self._raw_history(res.history)
         out["target_item"] = self.to_raw(res.target_item) if res.target_item else None
         out["recommendations"] = [self._raw_entry(e) for e in res.recommendations]
@@ -299,6 +305,43 @@ class ShortRecService:
                 f"{float(m.get('id_dropout_prob', 0.0) or 0.0)}",
                 f"{float(m.get('item_dropout_prob', 0.0) or 0.0)}")
 
+    def evaluation(self) -> dict:
+        """Offline evaluation artifacts, as-is, for the System page charts.
+
+        Nothing is recomputed or hard-coded here: these are the same CSV files
+        the README tables are generated from.
+        """
+        def table(name: str) -> list[dict]:
+            path = self.root / "results" / "tables" / name
+            if not path.exists():
+                return []
+            with open(path, newline="", encoding="utf-8") as f:
+                rows = []
+                for r in csv.DictReader(f):
+                    rows.append({k: _f(v) if v not in (None, "") else None for k, v in r.items()})
+                return rows
+
+        recall = table("recall_eval.csv")
+        ks = sorted({int(k.split("@")[1]) for k in recall[0] if k.startswith("Recall@")}) if recall else []
+        return {
+            "recall_by_budget": {
+                "ks": ks,
+                "channels": [
+                    {"channel": r["channel"], "values": [r.get(f"Recall@{k}") for k in ks]}
+                    for r in recall
+                ],
+                "num_users": int(recall[0]["num_users"]) if recall and recall[0].get("num_users") else None,
+            },
+            "pipeline_tradeoff": table("pipeline_tradeoff.csv"),
+            "latency": table("latency_benchmark.csv"),
+            "source_contribution": table("recall_source_contribution.csv"),
+            "notes": {
+                "recall": "candidate-generation Recall@K on the test target, history masked",
+                "pipeline": "same checkpoint and user sample for both pipeline and full-catalogue",
+                "latency": "CPU demo benchmark; median; relative comparison only",
+            },
+        }
+
     def model_infos(self) -> list[dict]:
         metrics = self.offline_metrics()
         infos = []
@@ -316,6 +359,20 @@ class ShortRecService:
     # ------------------------------------------------------------------
     # cold start explorer
     # ------------------------------------------------------------------
+    def exploration_summary(self) -> dict:
+        """Zero-train (serving) vs simulated-cold (benchmark) item counts."""
+        base = self.metadata.summary()
+        cold = self.cold_metadata.summary() if self.cold_metadata is not None else None
+        return {
+            "serving_zero_train_items": base["zero_train_frequency_items"],
+            "serving_exploration_candidates": base["exploration_candidates"],
+            "benchmark_simulated_cold_items": (cold or {}).get("cold_items", 0),
+            "note": ("Zero-train items have no observed training interactions in the base "
+                     "split and drive the serving exploration quota. Simulated cold items "
+                     "are a controlled benchmark subset with all training interactions "
+                     "removed, reported in results/tables/cold_start.csv."),
+        }
+
     def cold_summary(self) -> dict:
         path = self.root / "results" / "tables" / "cold_start.csv"
         experiments: list[dict] = []
@@ -331,14 +388,16 @@ class ShortRecService:
                         "cold_only_recall@10": _f(r.get("ColdOnly Recall@10")),
                         "cold_only_recall@20": _f(r.get("ColdOnly Recall@20")),
                     })
-        n_cold = int(self.cold_data.is_cold.sum()) if self.cold_data is not None else 0
+        n_cold = int(self.cold_data.is_simulated_cold.sum()) if self.cold_data is not None else 0
         n_users_cold_target = 0
         if self.cold_data is not None:
             targets = np.concatenate([self.cold_data.val_target, self.cold_data.test_target])
-            n_users_cold_target = int(self.cold_data.is_cold[targets].sum())
+            n_users_cold_target = int(self.cold_data.is_simulated_cold[targets].sum())
+        zero_train = int(self.metadata.is_zero_train_signal[1:].sum())
         return {
             "dataset": "MicroLens-100K (simulated cold split)",
             "num_cold_items": n_cold,
+            "serving_zero_train_items": zero_train,
             "num_users_with_cold_target": n_users_cold_target,
             "experiments": experiments,
             "note": (
@@ -359,14 +418,16 @@ class ShortRecService:
         if self.cold_data is None:
             return None
         i = int(self._raw_to_internal.get(int(item_raw), 0))
-        if i <= 0 or i > self.cold_data.num_items or not self.cold_data.is_cold[i]:
+        if i <= 0 or i > self.cold_data.num_items or not self.cold_data.is_simulated_cold[i]:
             return None
         meta = self.cold_metadata.of(i)
         return {
             "item_id": int(item_raw),
             "train_interactions": meta.train_interactions,
             "is_cold": True,
-            "popularity_bucket": "cold",
+            "is_simulated_cold": True,
+            "is_zero_train_signal": True,
+            "popularity_bucket": "simulated_cold",
             "content_available": self.content_availability(i),
             "content_similar": self.content_similar(i, k=6),
         }

@@ -6,7 +6,7 @@
   "mean_neighbours_per_item": 74.27100010132739,
   "items_with_no_neighbour": 376,
   "max_similarity": 1.0,
-  "build_time_s": 22.29,
+  "build_time_s": 22.06,
   "out": "artifacts/itemcf_neighbors.npz",
   "note": "built from training interactions only; no val/test leakage"
 }

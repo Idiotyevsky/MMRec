@@ -79,7 +79,43 @@ registry, rerank policies, FastAPI), a React demo (Feed / Inspector / Cold Start
 - Demo runs end to end: API on :8000, Vite on :5173, `/api/*` proxied.
 - Screenshots captured from the running app into `assets/`.
 
-## Bugs found and fixed this phase
+## Bugs found and fixed (correctness round)
+
+- **`benchmark_latency.py` never scored the full catalogue.** The
+  `candidate_k = 19738` row sliced `merged.item_ids()[:cand_k]`, i.e. the recall
+  union (≤ ~2 900 items), so the "full catalogue" measurement was not one. It now
+  scores `np.arange(1, num_items + 1)` explicitly.
+- **Ranking latency was one number.** The ranker is now split into
+  `encode_user()` and `score_with_user_vector()` so the benchmark reports
+  recall / encode / score / mask separately. Result: encoding dominates, and
+  scoring the whole catalogue costs about the same as scoring a 100-item pool.
+- **`seen_mask_overhead` assumed scores were indexed by item id**, but the score
+  array is positional. It now takes the item ids and is tested both ways.
+- **Pipeline retention compared two different protocols.** A single-seed 10 k-user
+  pipeline number was being divided by a 3-seed 100 k-user full-ranking mean.
+  `evaluate_pipeline.py` now evaluates the full-catalogue ranking with the *same
+  checkpoint and the same user sample* and reports `recall_retention`.
+- **The pipeline user sample was `users[:N]`**, which is id-order biased. It is
+  now a seeded random sample and the hash is written to the artifact.
+- **ItemCF's training boundary was hard-coded** as `offsets[1:] - 2` instead of
+  being read from `train_len`. It now uses `offsets[:-1] + train_len`; a
+  regression test asserts the index changes when `train_len` changes.
+- **`min_cooccurrence` was a no-op parameter.** It is now a real threshold on the
+  raw co-occurrence count, with a test that every surviving pair has at least
+  that many shared users.
+- **`compare_score or -1e30`** treated a legitimate score of `0.0` as missing.
+  Replaced with explicit `None` checks.
+- **The Inspector trace read a truncated list.** `recall_candidates` is a preview
+  of the first N pool entries, so any item outside it showed `—` for every
+  channel even though it had been recalled. The trace now uses the candidate's own
+  `source_trace`.
+- **The GIF played 4× too fast.** Frame duration was hard-coded from a nominal
+  fps instead of the real capture interval; frames now carry timestamps and the
+  GIF plays back at the speed the demo actually ran.
+- **Torch thread oversubscription in serving** (previous round, still relevant):
+  ~190 ms → ~9 ms per request.
+
+## Bugs found and fixed (first serving round)
 
 - **Off-by-one between serving user ids and `ProcessedData`.** The serving layer
   uses 1-based internal user ids while `ProcessedData` indexes users 0-based.
@@ -124,6 +160,19 @@ registry, rerank policies, FastAPI), a React demo (Feed / Inspector / Cold Start
 - The API is single-process, unauthenticated, uncached, and CORS-open: it is a
   local demo, not a deployment.
 
+## Correctness round (this phase)
+
+Serving-side definitions are now separated and tested:
+
+| concept | meaning | where |
+|---|---|---|
+| simulated cold | benchmark subset with all training interactions removed | `data/processed/cold10`, `results/tables/cold_start.csv` |
+| zero-train signal | items with zero observed training interactions in the base split | `ItemMetadata.is_zero_train_signal`, the exploration quota |
+
+The exploration quota now targets `exploration_candidate` (zero-train or
+simulated cold) and records the **exact ids it injected**, rather than guessing
+from the final rank.
+
 ## Experiment status
 
 | group | status |
@@ -132,7 +181,9 @@ registry, rerank policies, FastAPI), a React demo (Feed / Inspector / Cold Start
 | cold split (random, ID-only, content-only, gated, gated+ID-dropout) | complete |
 | gate analysis export | complete |
 | recall evaluation (Recall@100/200/500/1000) | complete |
-| two-stage pipeline trade-off (candidate budget vs accuracy vs latency) | complete |
+| two-stage pipeline trade-off (same-checkpoint retention) | complete |
+| latency benchmark split by stage | complete |
+| demo user selection (objective criteria) | complete |
 | Semantic-ID quantiser + generative prototype | complete |
 
 ## Next highest-priority tasks

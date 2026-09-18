@@ -701,12 +701,11 @@ def recall_table() -> str:
 
 
 def pipeline_table() -> str:
-    """Candidate size vs accuracy vs latency.
+    """Two-stage retention: same checkpoint, same user sample, both protocols.
 
-    Accuracy comes from ``pipeline_tradeoff.csv`` (many users, one timing each);
-    latency comes from ``latency_benchmark.csv`` (few users, many repetitions).
-    They are measured separately because on a shared machine a single timing per
-    user is dominated by contention, not by the candidate budget.
+    Reads ``pipeline_tradeoff.csv`` (accuracy, same-checkpoint baseline) and
+    ``latency_benchmark.csv`` (stage timings, measured separately because a
+    single timing per user is dominated by machine noise).
     """
     rows = read("pipeline_tradeoff.csv")
     if not rows:
@@ -718,34 +717,32 @@ def pipeline_table() -> str:
         k = r["candidate_k"]
         lat = latency.get(k, {})
         body.append([
-            k, fmt(r.get("candidate_recall")), fmt(r.get("final_Recall@20")),
-            fmt(r.get("final_NDCG@20")),
-            fmt(lat.get("recall_ms_min"), 1) if lat else TBD,
-            fmt(lat.get("rank_ms_min"), 2) if lat else TBD,
+            k,
+            fmt(r.get("candidate_recall")),
+            fmt(r.get("pipeline_Recall@20")),
+            fmt(r.get("recall_retention"), 3),
+            fmt(lat.get("recall_ms_median"), 1) if lat else TBD,
+            fmt(lat.get("score_ms_median"), 2) if lat else TBD,
+            fmt(lat.get("encode_ms_median"), 2) if lat else TBD,
         ])
-    full = latency.get("19738")
+
+    full = rows[0].get("full_Recall@20")
     n = rows[0].get("num_users", TBD)
+    seed = rows[0].get("eval_seed", TBD)
     out = md_table(
-        ["Candidate budget", "Candidate recall", "Final Recall@20", "Final NDCG@20",
-         "Recall latency (ms)", "Rank latency (ms)"], body
+        ["Candidate budget", "Candidate recall", "Pipeline Recall@20", "Retention",
+         "Recall latency (ms)", "Score (ms)", "Encode (ms)"], body
     )
-    if full:
-        out += (f"\n\nFor reference, ranking the **entire** catalogue "
-                f"({full['candidate_k']} items) costs {float(full['rank_ms_min']):.2f} ms "
-                f"on the same machine — essentially the same as a 100-item pool, because "
-                f"the ranker's cost here is dominated by encoding the user sequence, not by "
-                f"scoring candidates.")
-    lat_rows = read("latency_benchmark.csv")
-    if lat_rows:
-        lu, lr = lat_rows[0].get("users", "?"), lat_rows[0].get("rank_repeats", "?")
-        lat_note = (f"latency from a separate benchmark ({lu} users × {lr} repetitions, "
-                    f"minimum reported)")
-    else:
-        lat_note = "latency benchmark not run"
-    return out + (f"\n\n_{n} users for accuracy; {lat_note}. Ranker "
-                  f"`{rows[0].get('ranker', '?')}`, CPU serving. Candidate recall is the "
-                  f"share of users whose next item is in the pool at all — the hard ceiling "
-                  f"of the pipeline._")
+    out += (f"\n\nSame-checkpoint, same-user full-catalogue **Recall@20 = {fmt(full)}** "
+            f"({n} users, sample seed {seed}). *Retention* is pipeline ÷ that baseline — the "
+            f"only apples-to-apples way to state it.")
+    return out + (
+        "\n\nLatency columns are from `scripts/benchmark_latency.py` (CPU, median, this "
+        "machine) and are for relative comparison only. Note that the **encode** stage "
+        "dominates: scoring the whole catalogue costs about the same as scoring a 100-item "
+        "pool, so the two-stage split buys recall quality and catalogue headroom rather than "
+        "latency at this scale."
+    )
 
 
 def source_table() -> str:

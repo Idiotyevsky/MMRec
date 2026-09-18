@@ -65,18 +65,31 @@ class CandidateMerger:
         history: Sequence[int],
         per_source_k: int = 200,
         sources: Sequence[str] | None = None,
+        trace: dict | None = None,
     ) -> dict[str, list[RecallCandidate]]:
-        """Run every requested channel independently."""
+        """Run every requested channel independently.
+
+        When ``trace`` is supplied it is filled with per-channel latency and
+        errors, so the UI can show what each channel actually did for this
+        request instead of only the merged result.
+        """
+        import time
+
         wanted = set(sources) if sources else None
         out: dict[str, list[RecallCandidate]] = {}
+        timings: dict[str, float] = {}
         for s in self.strategies:
             if wanted is not None and s.name not in wanted:
                 continue
+            t0 = time.perf_counter()
             try:
                 out[s.name] = s.recall(user_id, history, per_source_k)
             except Exception as exc:  # a dead channel must not kill the request
                 out[s.name] = []
                 out.setdefault("_errors", []).append(f"{s.name}: {exc}")  # type: ignore[arg-type]
+            timings[s.name] = (time.perf_counter() - t0) * 1000
+        if trace is not None:
+            trace["per_source_latency_ms"] = {k: round(v, 3) for k, v in timings.items()}
         return out
 
     # ------------------------------------------------------------------
@@ -106,8 +119,16 @@ class CandidateMerger:
                 entry.merge_score += 1.0 / (self.rrf_k + c.rank)
 
         ordered = sorted(merged.values(), key=lambda c: (-c.merge_score, c.item_id))
+        # how many items each channel is the *only* source for: the channel's
+        # irreplaceable contribution to the pool, which is the honest way to read
+        # a multi-channel recall setup
+        unique_contribution = {name: 0 for name in per_source}
+        for c in ordered:
+            if len(c.sources) == 1:
+                unique_contribution[c.sources[0]["name"]] += 1
         stats = {
             "per_source": {k: len(v) for k, v in per_source.items()},
+            "unique_contribution": unique_contribution,
             "before_dedup": int(before),
             "after_dedup": int(len(ordered)),
             "duplicates_removed": int(before - len(ordered)),
@@ -125,8 +146,9 @@ class CandidateMerger:
         per_source_k: int = 200,
         total_k: int | None = None,
         sources: Sequence[str] | None = None,
+        trace: dict | None = None,
     ) -> MergeResult:
-        result = self.merge(self.recall(user_id, history, per_source_k, sources))
+        result = self.merge(self.recall(user_id, history, per_source_k, sources, trace=trace))
         if total_k is not None and len(result.candidates) > total_k:
             result.candidates = result.candidates[:total_k]
             result.stats["truncated_to"] = int(total_k)
@@ -136,6 +158,8 @@ class CandidateMerger:
             for name in c.source_names:
                 coverage[name] = coverage.get(name, 0) + 1
         result.stats["source_coverage_in_pool"] = coverage
+        if trace is not None:
+            result.stats["per_source_latency_ms"] = trace.get("per_source_latency_ms", {})
         return result
 
     def is_ready(self) -> dict[str, tuple[bool, str]]:

@@ -125,6 +125,11 @@ def create_app(**service_kwargs):
     def models() -> dict:
         return {"models": get_service().model_infos()}
 
+    @app.get("/evaluation")
+    def evaluation() -> dict:
+        """Offline recall / pipeline / latency artifacts for the System page."""
+        return get_service().evaluation()
+
     # ------------------------------------------------------------------
     @app.get("/users/{user_id}", response_model=UserResponse)
     def user(user_id: int) -> dict:
@@ -151,17 +156,24 @@ def create_app(**service_kwargs):
         ranker: str | None = Query(None, description="sasrec | mm_concat | mm_gated"),
         recall_k: int = Query(200, ge=1, le=2000, description="per-channel budget"),
         top_k: int = Query(20, ge=1, le=100),
-        cold_exploration: bool = Query(False),
-        cold_quota: int = Query(2, ge=0, le=20),
+        exploration: bool = Query(False, description="reserve exposure slots for zero-train items"),
+        exploration_quota: int = Query(2, ge=0, le=20),
+        cold_exploration: bool | None = Query(None, deprecated=True,
+                                              description="alias of `exploration`"),
+        cold_quota: int | None = Query(None, ge=0, le=20, deprecated=True),
         max_candidates: int | None = Query(None, ge=1, le=20000),
     ) -> dict:
         svc = get_service()
+        if cold_exploration is not None:
+            exploration = cold_exploration
+        if cold_quota is not None:
+            exploration_quota = cold_quota
         if ranker is not None and ranker not in svc.registry.names:
             raise HTTPException(status_code=400,
                                 detail=f"unknown ranker {ranker!r}; available {svc.registry.names}")
         try:
             return _timed(svc.recommend, user_id, recall_k, top_k, ranker,
-                          cold_exploration, cold_quota, max_candidates)
+                          exploration, exploration_quota, max_candidates)
         except IndexError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
 
@@ -172,15 +184,18 @@ def create_app(**service_kwargs):
         compare: str | None = Query("sasrec", description="baseline ranker to diff against"),
         recall_k: int = Query(200, ge=1, le=2000),
         top_n: int = Query(30, ge=1, le=200),
-        cold_exploration: bool = Query(False),
+        exploration: bool = Query(False),
+        cold_exploration: bool | None = Query(None, deprecated=True),
     ) -> dict:
+        if cold_exploration is not None:
+            exploration = cold_exploration
         svc = get_service()
         for name in (ranker, compare):
             if name is not None and name not in svc.registry.names:
                 raise HTTPException(status_code=400, detail=f"unknown ranker {name!r}")
         try:
             return _timed(svc.inspect, user_id, recall_k, top_n, ranker,
-                          compare, cold_exploration)
+                          compare, exploration)
         except IndexError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
 

@@ -1,0 +1,38 @@
+{
+  "user_id": 68317,
+  "quality": 1060.0,
+  "history_length": 6,
+  "recall_sources_in_top": [
+    "itemcf",
+    "semantic"
+  ],
+  "multi_source_candidates": 1,
+  "max_rank_move": 528,
+  "moved_item": {
+    "item_id": 18101,
+    "position_delta": 528,
+    "sources": [
+      "semantic"
+    ]
+  },
+  "recall_summary": {
+    "per_source": {
+      "popular": 200,
+      "itemcf": 200,
+      "semantic": 200
+    },
+    "before_dedup": 600,
+    "after_dedup": 594,
+    "duplicates_removed": 6
+  },
+  "scan_seed": 7,
+  "candidates_scanned": 150,
+  "users_passing_filters": 85,
+  "criteria": {
+    "min_history": 5,
+    "min_rank_move": 5,
+    "needs_semantic_or_multi_source": true
+  },
+  "ranker": "mm_concat",
+  "compare_ranker": "sasrec"
+}

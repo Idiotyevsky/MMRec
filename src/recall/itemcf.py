@@ -55,9 +55,12 @@ def build_itemcf_index(
     num_users = offsets.shape[0] - 1
 
     # ---- gather training positions only (no val/test leakage) ----
+    # The boundary comes from the split metadata (`user_offsets[:-1] + train_len`)
+    # rather than from a hard-coded "leave two out" formula, so changing the
+    # split definition cannot silently leave this index built on the wrong rows.
     user_of = np.repeat(np.arange(num_users, dtype=np.int64), np.diff(offsets))
     pos = np.arange(flat.shape[0])
-    train_end = offsets[1:] - 2
+    train_end = offsets[:-1] + tlen
     is_train = pos < train_end[user_of]
     items = flat[is_train]
     users = user_of[is_train]
@@ -76,19 +79,26 @@ def build_itemcf_index(
     inv[nz] = 1.0 / np.sqrt(freq[nz])
     Xn = X @ sparse.diags(inv)  # column-normalised
     Xn = Xn.tocsc()
+    Xb = X.tocsc()  # binary copy, used for the raw co-occurrence count
 
     neighbors = np.zeros((num_items + 1, top_m), dtype=np.int32)
     sims = np.zeros((num_items + 1, top_m), dtype=np.float32)
+    n_filtered = 0
 
     for start in range(1, num_items + 1, chunk_size):
         end = min(start + chunk_size, num_items + 1)
         block = (Xn.T @ Xn[:, start:end]).toarray()  # (num_items+1, end-start)
+        if min_cooccurrence > 1:
+            # threshold on the RAW co-occurrence count, not on the similarity:
+            # two items sharing one user can have a high cosine, which is noise
+            counts = (Xb.T @ Xb[:, start:end]).toarray()
+            dropped = (counts < min_cooccurrence) & (block > 0)
+            n_filtered += int(dropped.sum())
+            block[dropped] = 0.0
         block[:PAD + 1, :] = 0.0
         for col in range(end - start):
             item = start + col
             block[item, col] = 0.0  # never recommend an item as its own neighbour
-        if min_cooccurrence > 1:
-            block[block < 1e-12] = 0.0
         k = min(top_m, block.shape[0])
         idx = np.argpartition(-block, kth=k - 1, axis=0)[:k]
         vals = np.take_along_axis(block, idx, axis=0)
@@ -101,7 +111,8 @@ def build_itemcf_index(
             print(f"  itemcf: {end - 1}/{num_items} items")
 
     sims[neighbors == PAD] = 0.0
-    return {"neighbors": neighbors, "sims": sims, "freq": freq.astype(np.int64)}
+    return {"neighbors": neighbors, "sims": sims, "freq": freq.astype(np.int64),
+            "n_filtered_by_min_cooccurrence": np.int64(n_filtered)}
 
 
 def save_itemcf_index(index: dict[str, np.ndarray], path: str | Path) -> None:

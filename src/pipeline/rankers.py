@@ -87,19 +87,66 @@ class Ranker:
             self._item_emb = model.all_item_embeddings().detach()
 
     # ------------------------------------------------------------------
-    def user_vector(self, history_internal) -> torch.Tensor:
+    def encode_user(self, history_internal) -> torch.Tensor:
+        """Sequence encoder only: history -> user vector.
+
+        Kept separate from :meth:`score_with_user_vector` so a latency benchmark
+        can time the two stages independently.  The encoder cost is constant in
+        the candidate count; the scoring cost is not.
+        """
         seq = np.asarray(list(history_internal), dtype=np.int64)[-self.max_seq_len :]
         ids = np.zeros((1, self.max_seq_len), dtype=np.int64)
         ids[0, self.max_seq_len - len(seq):] = seq
         with torch.no_grad():
             return self.model.encode(torch.as_tensor(ids, dtype=torch.long, device=self.device))
 
-    def score_candidates(self, history_internal, candidate_ids) -> np.ndarray:
-        """Ranking score for a specific candidate list (the serving path)."""
-        h = self.user_vector(history_internal)
+    def score_with_user_vector(self, user_vector: torch.Tensor, candidate_ids) -> np.ndarray:
+        """Score a candidate list against an already-encoded user vector."""
         idx = torch.as_tensor(np.asarray(candidate_ids, dtype=np.int64), device=self.device)
         with torch.no_grad():
-            return (h @ self._item_emb[idx].t()).squeeze(0).float().cpu().numpy()
+            return (user_vector @ self._item_emb[idx].t()).squeeze(0).float().cpu().numpy()
+
+    def user_vector(self, history_internal) -> torch.Tensor:
+        """Alias kept for the existing call sites."""
+        return self.encode_user(history_internal)
+
+    def score_candidates(self, history_internal, candidate_ids) -> np.ndarray:
+        """Ranking score for a specific candidate list (the serving path)."""
+        return self.score_with_user_vector(self.encode_user(history_internal), candidate_ids)
+
+    def valid_item_ids(self) -> np.ndarray:
+        """Every real catalogue item (internal ids 1..num_items), PAD excluded."""
+        return np.arange(1, self.data.num_items + 1, dtype=np.int64)
+
+    def seen_mask_overhead(self, history_internal, scores: np.ndarray,
+                           item_ids: np.ndarray | None = None) -> np.ndarray:
+        """Apply the serving seen-item mask and return the masked scores.
+
+        ``scores[k]`` corresponds to ``item_ids[k]``.  When ``item_ids`` is
+        ``None`` the scores are assumed to be the full catalogue in internal-id
+        order (``scores[i - 1]`` for internal id ``i``), which is the case the
+        latency benchmark uses.
+
+        Exposed separately so the benchmark can report masking cost on its own
+        rather than folding it into scoring.
+        """
+        out = np.asarray(scores, dtype=np.float32).copy()
+        if item_ids is None:
+            positions = {int(i): int(i) - 1 for i in history_internal
+                         if 0 < int(i) <= out.shape[0]}
+        else:
+            ids = np.asarray(item_ids, dtype=np.int64)
+            order = np.argsort(ids, kind="stable")
+            sorted_ids = ids[order]
+            positions = {}
+            for i in history_internal:
+                i = int(i)
+                k = int(np.searchsorted(sorted_ids, i))
+                if k < sorted_ids.shape[0] and sorted_ids[k] == i:
+                    positions[i] = int(order[k])
+        for pos in positions.values():
+            out[pos] = -np.inf
+        return out
 
     def score_all(self, history_internal) -> np.ndarray:
         """Score the whole catalogue (used for comparison views)."""

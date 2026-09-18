@@ -47,6 +47,17 @@ class ProcessedData:
     stats: dict
 
     # ------------------------------------------------------------------
+    @property
+    def is_simulated_cold(self) -> np.ndarray:
+        """Alias for ``is_cold`` with the semantics spelled out.
+
+        The on-disk field is still called ``is_cold`` (existing artifacts stay
+        valid), but in code and in the UI this is specifically the *simulated
+        cold-start benchmark* split, not "an item with no training signal".
+        """
+        return self.is_cold
+
+    # ------------------------------------------------------------------
     @classmethod
     def load(cls, path: str | Path) -> "ProcessedData":
         path = Path(path)
@@ -129,7 +140,7 @@ class ProcessedData:
             f"{s['num_users']} users | {s['num_items']} items | "
             f"{s['num_interactions']} interactions | "
             f"avg len {s['avg_sequence_length']:.2f} | "
-            f"cold items {int(self.is_cold.sum())}"
+            f"simulated cold items {int(self.is_cold.sum())}"
         )
 
 

@@ -1,6 +1,7 @@
 import type {
   ColdItem,
   ColdSummary,
+  EvaluationResponse,
   InspectResponse,
   ModelInfo,
   RecallResponse,
@@ -38,14 +39,21 @@ export const api = {
       ranker?: string;
       recall_k?: number;
       top_k?: number;
-      cold_exploration?: boolean;
-      cold_quota?: number;
+      exploration?: boolean;
+      exploration_quota?: number;
     } = {},
   ) => get<RecommendResponse>(`/users/${id}/recommend`, opts),
   inspect: (
     id: number,
-    opts: { ranker?: string; compare?: string; recall_k?: number; top_n?: number } = {},
+    opts: {
+      ranker?: string;
+      compare?: string;
+      recall_k?: number;
+      top_n?: number;
+      exploration?: boolean;
+    } = {},
   ) => get<InspectResponse>(`/users/${id}/inspect`, opts),
+  evaluation: () => get<EvaluationResponse>("/evaluation"),
   coldSummary: () => get<ColdSummary>("/cold/summary"),
   coldItems: (n = 12, seed = 0) => get<ColdItem[]>("/cold/items", { n, seed }),
   coldItem: (id: number) => get<ColdItem>(`/cold/items/${id}`),

@@ -73,6 +73,6 @@
     "min": 1844,
     "max": 2915
   },
-  "eval_time_s": 3818.7,
+  "eval_time_s": 3888.2,
   "note": "candidate generation quality; the user's own history is always excluded"
 }
