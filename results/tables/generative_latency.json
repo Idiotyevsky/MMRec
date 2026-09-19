@@ -1,0 +1,64 @@
+{
+  "checkpoint": "results/runs/genrec_sid/best.pt",
+  "semantic_ids": "artifacts/semantic_ids.npz",
+  "max_history": 20,
+  "repeats": 3,
+  "rows": [
+    {
+      "beam_width": 1,
+      "users": 50,
+      "batch_size": 64,
+      "device": "cpu",
+      "ms_per_user": 42.662,
+      "users_per_second": 23.4,
+      "mean_candidates": 0.96,
+      "empty_decodings": 0,
+      "empty_rate": 0.0
+    },
+    {
+      "beam_width": 5,
+      "users": 50,
+      "batch_size": 64,
+      "device": "cpu",
+      "ms_per_user": 193.096,
+      "users_per_second": 5.2,
+      "mean_candidates": 4.88,
+      "empty_decodings": 0,
+      "empty_rate": 0.0
+    },
+    {
+      "beam_width": 10,
+      "users": 50,
+      "batch_size": 64,
+      "device": "cpu",
+      "ms_per_user": 363.203,
+      "users_per_second": 2.8,
+      "mean_candidates": 9.8,
+      "empty_decodings": 0,
+      "empty_rate": 0.0
+    },
+    {
+      "beam_width": 20,
+      "users": 50,
+      "batch_size": 64,
+      "device": "cpu",
+      "ms_per_user": 741.925,
+      "users_per_second": 1.3,
+      "mean_candidates": 19.68,
+      "empty_decodings": 0,
+      "empty_rate": 0.0
+    },
+    {
+      "beam_width": 50,
+      "users": 50,
+      "batch_size": 64,
+      "device": "cpu",
+      "ms_per_user": 1843.513,
+      "users_per_second": 0.5,
+      "mean_candidates": 49.66,
+      "empty_decodings": 0,
+      "empty_rate": 0.0
+    }
+  ],
+  "note": "single-threaded CPU unless --device cuda; median over repeats after a warm-up pass; candidates are counted after collision expansion and seen-item masking"
+}

@@ -1,0 +1,65 @@
+{
+  "checkpoint": "results/runs/genrec_sid/best.pt",
+  "semantic_ids": "artifacts/semantic_ids.npz",
+  "max_history": 20,
+  "repeats": 3,
+  "rows": [
+    {
+      "beam_width": 1,
+      "users": 300,
+      "batch_size": 64,
+      "device": "cuda",
+      "ms_per_user": 7.291,
+      "users_per_second": 137.2,
+      "mean_candidates": 0.97,
+      "empty_decodings": 0,
+      "empty_rate": 0.0
+    },
+    {
+      "beam_width": 5,
+      "users": 300,
+      "batch_size": 64,
+      "device": "cuda",
+      "ms_per_user": 10.401,
+      "users_per_second": 96.1,
+      "mean_candidates": 4.91,
+      "empty_decodings": 0,
+      "empty_rate": 0.0
+    },
+    {
+      "beam_width": 10,
+      "users": 300,
+      "batch_size": 64,
+      "device": "cuda",
+      "ms_per_user": 15.306,
+      "users_per_second": 65.3,
+      "mean_candidates": 9.85,
+      "empty_decodings": 0,
+      "empty_rate": 0.0
+    },
+    {
+      "beam_width": 20,
+      "users": 300,
+      "batch_size": 64,
+      "device": "cuda",
+      "ms_per_user": 152.038,
+      "users_per_second": 6.6,
+      "mean_candidates": 19.75,
+      "empty_decodings": 0,
+      "empty_rate": 0.0
+    },
+    {
+      "beam_width": 50,
+      "users": 300,
+      "batch_size": 64,
+      "device": "cuda",
+      "ms_per_user": 103.446,
+      "users_per_second": 9.7,
+      "mean_candidates": 49.54,
+      "empty_decodings": 0,
+      "empty_rate": 0.0
+    }
+  ],
+  "note": "GPU run on a SHARED machine; timings are unstable (beam 50 measured faster than beam 20 under contention). Kept as raw evidence, not as a headline number. The CPU run in generative_latency.json governs the serving decision.",
+  "caveat": "shared-machine contention; not used for any reported claim"
+}

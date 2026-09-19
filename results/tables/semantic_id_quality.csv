@@ -1,0 +1,6 @@
+scope,num_items,num_levels,codebook_size,utilization,dead_codes,entropy,perplexity,max_code_count,min_code_count,unique_semantic_ids,unique_ratio,collision_count,collision_rate,num_colliding_sids,max_items_per_sid,num_items_in_collisions
+level_1,19738,4,256,1.0,0,5.405629,222.656127,163,1,,,,,,,
+level_2,19738,4,256,1.0,0,5.439345,230.291228,156,1,,,,,,,
+level_3,19738,4,256,1.0,0,5.493499,243.106259,119,1,,,,,,,
+level_4,19738,4,256,1.0,0,5.498862,244.413683,115,1,,,,,,,
+overall,19738,4,256,1.0,0,5.459334,235.116824,,,19692,0.997669,46,0.002331,38,5,84

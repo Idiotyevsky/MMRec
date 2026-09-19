@@ -692,12 +692,23 @@ def recall_table() -> str:
     if not rows:
         return f"_Recall evaluation has not been run yet — {TBD}._"
     ks = sorted({int(k.split("@")[1]) for k in rows[0] if k.startswith("Recall@")})
-    body = [[r["channel"]] + [fmt(r.get(f"Recall@{k}")) for k in ks] for r in rows]
+    has_counts = any(r.get("mean_candidates") for r in rows)
+    body = []
+    for r in rows:
+        row = [r["channel"]] + [fmt(r.get(f"Recall@{k}")) for k in ks]
+        if has_counts:
+            # a channel that cannot produce K candidates is capped by its own
+            # budget, not by the metric; showing the count makes that visible
+            row.append(fmt(r.get("mean_candidates"), 1))
+        body.append(row)
+    header = ["Channel"] + [f"Recall@{k}" for k in ks] + (["Candidates/user"] if has_counts else [])
     n = rows[0].get("num_users", TBD)
-    return md_table(["Channel"] + [f"Recall@{k}" for k in ks], body) + (
-        f"\n\n_Test target, user history masked, {n} users. Candidate-generation quality: "
-        "this is the ceiling the ranker can reach._"
-    )
+    note = ("\n\n_Test target, user history masked, {n} users. Candidate-generation quality: "
+            "this is the ceiling the ranker can reach._".format(n=n))
+    if has_counts:
+        note += (" A channel whose candidate count is below a given K cannot exceed its own "
+                 "budget at that K; the generative row is capped by its beam width.")
+    return md_table(header, body) + note
 
 
 def pipeline_table() -> str:
@@ -973,6 +984,90 @@ def cold_summary() -> str:
     return md_table(["ColdOnly Recall@20", ""], body)
 
 
+def genrec_table() -> str:
+    """Generative Semantic-ID retrieval: trained model, decoding, and cost.
+
+    The architecture comes from the checkpoint's recorded args (the run metrics
+    file stores results, not hyperparameters), and the beam width comes from the
+    evaluation that produced the reported recall, so the latency row quotes the
+    cost of the configuration the numbers above it were measured with.
+    """
+    run = ROOT / "results" / "runs" / "genrec_sid" / "metrics.json"
+    if not run.exists():
+        return f"_Generative retrieval has not been trained yet — {TBD}._"
+    m = json.loads(run.read_text(encoding="utf-8"))
+    val, test = m.get("val") or {}, m.get("test") or {}
+
+    ckpt_path = ROOT / "results" / "runs" / "genrec_sid" / "best.pt"
+    args: dict = {}
+    if ckpt_path.exists():
+        import torch
+
+        args = (torch.load(ckpt_path, map_location="cpu", weights_only=False)
+                .get("args") or {})
+
+    stats = m.get("semantic_id_stats") or {}
+    # prefer the config recorded in the metrics file; fall back to the checkpoint
+    cfg = m.get("model_config") or {}
+    args = {**args, **{k: v for k, v in cfg.items() if v is not None}}
+    beam = val.get("beam_width") or args.get("beam_width")
+
+    latency = read("generative_latency.csv")
+    cpu = [r for r in latency if r.get("device") == "cpu"]
+    lat = None
+    if cpu and beam:
+        lat = next((r for r in cpu if int(r["beam_width"]) == int(beam)), None)
+
+    arch = (f"{args.get('num_layers', TBD)}-layer causal Transformer, "
+            f"hidden {args.get('hidden_size', TBD)} "
+            f"({_spaced(m.get('params'))} params)")
+    body = [
+        ["decoder", arch],
+        ["history", f"{args.get('max_items', TBD)} items x "
+                    f"{stats.get('num_levels', TBD)} tokens"],
+        ["constrained decoding",
+         f"prefix trie; {_spaced(val.get('empty_decodings', 0))} empty decodings"],
+        ["val Recall@20", fmt(val.get("Recall@20"))],
+        ["test Recall@20", fmt(test.get("Recall@20"))],
+    ]
+    if lat:
+        body.append(["decode latency",
+                     f"{fmt(lat.get('ms_per_user'), 1)} ms/user "
+                     f"(CPU, 1 thread, beam {lat.get('beam_width')})"])
+        body.append(["candidates/user", fmt(lat.get("mean_candidates"), 1)])
+    body.append(["Semantic-ID hash", f"`{m.get('semantic_id_hash', TBD)}`"])
+    out = md_table(["", ""], body)
+
+    # matched-budget comparison against the other channels, same users, same K
+    cmp_rows = read("genrec_comparison.csv")
+    if cmp_rows:
+        ks = sorted({int(k.split("@")[1]) for k in cmp_rows[0] if k.startswith("Recall@")})
+        label = {"popular": "popular", "itemcf": "itemcf", "semantic": "semantic (content kNN)",
+                 "generative": "**generative (Semantic ID)**", "merged": "merged pool"}
+        order = ["popular", "itemcf", "semantic", "generative", "merged"]
+        rows_by = {r["channel"]: r for r in cmp_rows}
+        body = [[label.get(c, c)] + [fmt(rows_by[c].get(f"Recall@{k}")) for k in ks]
+                for c in order if c in rows_by]
+        n = cmp_rows[0].get("num_users", TBD)
+        out += "\n\n" + md_table(["Channel"] + [f"Recall@{k}" for k in ks], body)
+        out += (f"\n\n_Matched budget: same {n} test users for every channel, beam wide "
+                "enough for the generative channel to fill the budget. Compare these rows "
+                "only with each other — this sample is easier than the full test set._")
+
+    # does the channel earn its place in the pool?
+    off = ROOT / "results" / "tables" / "genrec_comparison_off.json"
+    on = ROOT / "results" / "tables" / "genrec_comparison.json"
+    if off.exists() and on.exists():
+        a = json.loads(off.read_text(encoding="utf-8"))
+        b = json.loads(on.read_text(encoding="utf-8"))
+        gain = b["merged_targets_found"] - a["merged_targets_found"]
+        uniq = (b.get("unique_hits") or {}).get("generative", TBD)
+        out += (f"\n\nAdding the channel to the pool finds **{gain} more targets** "
+                f"({a['merged_targets_found']} → {b['merged_targets_found']}); "
+                f"{uniq} targets are reachable by this channel alone.")
+    return out
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", default=None)
@@ -997,6 +1092,7 @@ def main() -> None:
         "EFFICIENCY": efficiency_table(),
         "DATASET": dataset_table(),
         "SEMANTICID": semantic_id_table(),
+        "GENREC": genrec_table(),
     }
     text = "\n\n".join(f"<!-- {k} -->\n{v}" for k, v in sections.items())
     if args.out:

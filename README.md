@@ -541,7 +541,8 @@ _Candidate budget 2000. `multiple` means the item was found by more than one cha
 Content embeddings are quantised into Semantic IDs with an RQVAE, and a small
 causal Transformer generates the next item's ID instead of scoring vectors. This
 is an **extension**, not part of the main architecture: the project's core is
-multi-channel recall + multimodal ranking + cold-start analysis.
+multi-channel recall + multimodal ranking + cold-start analysis, and the
+generative channel is off by default in serving.
 
 <!-- TABLE:SEMANTICID -->
 |  |  |
@@ -561,6 +562,46 @@ collision rate was 49 %, which would have made generative retrieval meaningless.
 Decoding is constrained by a prefix trie, so the generator can only emit a code
 tuple that corresponds to a real item.
 
+**The hierarchy is real — but the obvious test says otherwise.** 38.2 % of an
+item's 10 nearest content neighbours share its first code, against a 0.39 %
+chance rate: a 98× lift. The naive check (mean content cosine between items
+sharing a prefix) reports *no* effect, because the content space is concentrated
+and random pairs already sit at +0.174, leaving the metric no room to show
+signal. Both tests ship in `scripts/analyze_semantic_ids.py`; the cosine one is
+kept as the documented counter-example rather than deleted.
+
+<!-- TABLE:GENREC -->
+|  |  |
+|---|---|
+| decoder | 3-layer causal Transformer, hidden 192 (1 547 712 params) |
+| history | 20 items x 4 tokens |
+| constrained decoding | prefix trie; 0 empty decodings |
+| val Recall@20 | 0.0817 |
+| test Recall@20 | 0.0590 |
+| decode latency | 741.9 ms/user (CPU, 1 thread, beam 20) |
+| candidates/user | 19.7 |
+| Semantic-ID hash | `ee98f46cb66193e0` |
+
+| Channel | Recall@20 | Recall@50 | Recall@100 |
+|---|---|---|---|
+| popular | 0.0020 | 0.0077 | 0.0130 |
+| itemcf | 0.1020 | 0.1413 | 0.1827 |
+| semantic (content kNN) | 0.0423 | 0.0607 | 0.0887 |
+| **generative (Semantic ID)** | 0.0643 | 0.0980 | 0.1333 |
+| merged pool | 0.0913 | 0.1403 | 0.1847 |
+
+_Matched budget: same 3000 test users for every channel, beam wide enough for the generative channel to fill the budget. Compare these rows only with each other — this sample is easier than the full test set._
+
+Adding the channel to the pool finds **53 more targets** (1359 → 1412); 53 targets are reachable by this channel alone.
+<!-- /TABLE:GENREC -->
+
+**Complementary, and the complement is small.** Generative retrieval beats the
+content-kNN channel it shares its inputs with (0.1333 vs 0.0887 at Recall@100)
+but sits well below item-based CF (0.1827). Adding it to the pool finds 53 more
+targets on 3 000 users — a real gain, and exactly the 53 targets no other channel
+reaches. It costs **741.9 ms/user on CPU** against 23.6 ms/user for every
+embedding channel combined, which is why it is reported as a measured extension
+rather than shipped in the serving path. Full protocol: [`docs/generative_retrieval.md`](docs/generative_retrieval.md).
 </details>
 
 ---
@@ -643,7 +684,8 @@ frontend/         React demo (Live Demo / Feed View / Inspector / Cold Start / S
 scripts/          train, prepare_demo, prepare_media_demo, evaluate_*, capture_*
 analysis/         aggregation, plotting, gate analysis, README generation
 tests/            unit + integration tests
-docs/             data_schema, evaluation_protocol, media_provenance, design
+docs/             data_schema, evaluation_protocol, media_provenance, design,
+                  generative_retrieval
 results/          runs/, tables/, figures/   (generated)
 artifacts/        indices, semantic IDs, demo manifests   (generated)
 ```

@@ -17,6 +17,7 @@ map to a real item (should be 100 % because of the prefix constraint).
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import sys
 import time
@@ -32,8 +33,27 @@ sys.path.insert(0, str(ROOT))
 from src.data.dataset import ProcessedData  # noqa: E402
 from src.models.generative_rec import GenerativeRecommender  # noqa: E402
 from src.models.semantic_id import BOS, PAD, SemanticIDMapper  # noqa: E402
+from src.utils.config import add_config_flag  # noqa: E402
 from src.utils.io import save_json  # noqa: E402
 from src.utils.seed import set_seed  # noqa: E402
+
+
+def load_semantic_ids(path: Path) -> tuple[np.ndarray, int, int]:
+    """Accept either the canonical artifact or a raw RQVAE export.
+
+    The canonical ``artifacts/semantic_ids.npz`` stores ``codes`` plus the two id
+    columns; a raw export also carries ``codebook_size``/``num_items``.  Reading
+    the meta file keeps the codebook size from being guessed.
+    """
+    npz = np.load(path)
+    codes = npz["codes"].astype(np.int64)
+    if "codebook_size" in npz and "num_items" in npz:
+        return codes, int(npz["codebook_size"]), int(npz["num_items"])
+    meta_path = path.with_name("semantic_ids_meta.json")
+    if not meta_path.exists():
+        raise SystemExit(f"{path} has no codebook_size and {meta_path} is missing")
+    meta = json.loads(meta_path.read_text(encoding="utf-8"))
+    return codes, int(meta["codebook_size"]), int(meta["num_items"])
 
 
 class TokenSeqDataset(Dataset):
@@ -151,6 +171,26 @@ def evaluate_generative(
     return out
 
 
+GENERATIVE_CONFIG_MAP = {
+    "hidden_size": "model.hidden_size",
+    "num_layers": "model.num_layers",
+    "num_heads": "model.num_heads",
+    "dropout": "model.dropout",
+    "processed_dir": "data.processed_dir",
+    "semantic_ids": "data.semantic_ids",
+    "max_items": "data.max_items",
+    "batch_size": "training.batch_size",
+    "lr": "training.learning_rate",
+    "weight_decay": "training.weight_decay",
+    "epochs": "training.epochs",
+    "patience": "training.early_stopping_patience",
+    "eval_users": "training.eval_users",
+    "seed": "training.seed",
+    "beam_width": "inference.beam_width",
+    "run_dir": "output.run_dir",
+}
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--semantic-ids", default="artifacts/semantic_ids_content.npz")
@@ -171,16 +211,17 @@ def main() -> None:
     ap.add_argument("--seed", type=int, default=42)
     ap.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
     ap.add_argument("--run-dir", default=None)
+    # applied last: argparse's add_argument(default=...) would otherwise
+    # clobber any default set before the flag is declared
+    add_config_flag(ap, GENERATIVE_CONFIG_MAP)
     args = ap.parse_args()
 
     set_seed(args.seed)
     device = torch.device(args.device)
     data = ProcessedData.load(ROOT / args.processed_dir)
 
-    npz = np.load(ROOT / args.semantic_ids)
-    codes = npz["codes"].astype(np.int64)
-    codebook_size = int(npz["codebook_size"])
-    num_items = int(npz["num_items"])
+    codes, codebook_size, num_items = load_semantic_ids(ROOT / args.semantic_ids)
+    sid_hash = hashlib.sha256(np.ascontiguousarray(codes).tobytes()).hexdigest()[:16]
     if num_items != data.num_items:
         raise SystemExit(f"semantic IDs built for {num_items} items but dataset has {data.num_items}")
     mapper = SemanticIDMapper(codes, num_items=num_items, codebook_size=codebook_size)
@@ -237,7 +278,7 @@ def main() -> None:
             val = evaluate_generative(
                 model, mapper, data, split="val", beam_width=args.beam_width,
                 batch_size=64, max_items=args.max_items, device=device,
-                max_users=min(5000, data.num_users),
+                max_users=min(args.eval_users or 2000, data.num_users),
             )
             metric = val["Recall@20"]
             history.append({"epoch": epoch, "train_loss": tot / max(n, 1), **val})
@@ -246,6 +287,7 @@ def main() -> None:
             if metric > best:
                 best, best_epoch = metric, epoch
                 torch.save({"model_state": model.state_dict(), "args": vars(args),
+                            "semantic_id_hash": sid_hash,
                             "mapper_stats": mapper.statistics()}, run_dir / "best.pt")
             elif epoch - best_epoch >= args.patience:
                 print("early stopping")
@@ -255,7 +297,14 @@ def main() -> None:
     model.load_state_dict(ckpt["model_state"])
 
     results = {"run_dir": str(run_dir), "params": model.num_parameters(),
-               "semantic_id_stats": mapper.statistics(), "history": history}
+               "semantic_id_hash": sid_hash, "semantic_ids": str(args.semantic_ids),
+               "semantic_id_stats": mapper.statistics(),
+               # recorded so downstream reporting does not have to reopen the
+               # checkpoint just to learn the architecture it is describing
+               "model_config": {"hidden_size": args.hidden_size, "num_layers": args.num_layers,
+                                "num_heads": args.num_heads, "dropout": args.dropout,
+                                "max_items": args.max_items, "beam_width": args.beam_width},
+               "history": history}
     for split in ("val", "test"):
         res = evaluate_generative(
             model, mapper, data, split=split, beam_width=args.beam_width,

@@ -1,0 +1,5 @@
+prefix_length,num_items_sampled,neighbours_per_item,num_pairs,share_sharing_prefix,chance_rate,lift_vs_chance
+1,3000,10,30000,0.3819,0.003906,97.7664
+2,3000,10,30000,0.033733,1.5e-05,2210.747733
+3,3000,10,30000,0.0027,0.0,45298.4832
+4,3000,10,30000,0.000633,0.0,2720145.954133

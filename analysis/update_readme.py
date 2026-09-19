@@ -57,7 +57,14 @@ def main() -> None:
             rf"(<!-- {full} -->\n).*?(\n<!-- /{full} -->)", flags=re.S
         )
         if not pattern.search(text):
-            print(f"  marker {full} not found in README -- skipped")
+            # distinguish "the marker is absent" from "the marker is present but
+            # empty", because an empty marker pair silently stops being updated
+            # and the --check count quietly drops
+            if f"<!-- {full} -->" in text:
+                print(f"  marker {full} is present but has no matchable body "
+                      f"(an empty marker pair is not updated) -- skipped")
+            else:
+                print(f"  marker {full} not found in README -- skipped")
             continue
         text = pattern.sub(lambda m: m.group(1) + body.strip() + m.group(2), text)
         injected.append(full)

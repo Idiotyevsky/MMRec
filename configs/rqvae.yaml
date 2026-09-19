@@ -1,0 +1,45 @@
+# RQ-VAE: multimodal content -> discrete Semantic ID
+#
+# One Semantic ID per item, built by residual-quantising the concatenated
+# text/image content embedding.  The output of this stage is the token
+# vocabulary the generative recommender decodes over, so a change here
+# invalidates every downstream generative checkpoint (the artifact records a
+# hash and the loader refuses mismatched pairs).
+model:
+  name: rqvae
+  num_levels: 4
+  codebook_size: 256
+  latent_size: 64
+  hidden_size: 256
+  num_layers: 2
+  dropout: 0.0
+
+data:
+  processed_dir: data/processed/base
+  feature_dir: data/raw
+  modalities: [text, image]
+  # each modality is L2-normalised before concatenation so the wider feature
+  # block does not dominate the latent
+  normalize_per_modality: true
+
+loss:
+  commitment_weight: 0.05
+  reconstruction: mse
+
+training:
+  batch_size: 512
+  learning_rate: 0.001
+  weight_decay: 0.0
+  epochs: 300
+  early_stopping_patience: 30
+  monitor: reconstruction_loss
+  monitor_mode: min
+  # codes that fall below this usage share are re-seeded from live latents,
+  # which is what keeps utilisation at 1.0 instead of collapsing
+  dead_code_threshold: 0.0
+  seed: 42
+
+output:
+  run_dir: results/runs/rqvae
+  checkpoint: artifacts/rqvae_content.pt
+  semantic_ids: artifacts/semantic_ids.npz

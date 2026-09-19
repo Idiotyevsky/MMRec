@@ -1,0 +1,98 @@
+{
+  "processed_dir": "data/processed/base",
+  "num_users": 3000,
+  "ks": [
+    20,
+    50,
+    100
+  ],
+  "per_source_k": 1000,
+  "channels": [
+    {
+      "channel": "popular",
+      "num_users": 3000,
+      "Recall@20": 0.002,
+      "Recall@50": 0.007666666666666666,
+      "Recall@100": 0.013,
+      "mean_candidates": 1000.0
+    },
+    {
+      "channel": "itemcf",
+      "num_users": 3000,
+      "Recall@20": 0.102,
+      "Recall@50": 0.14133333333333334,
+      "Recall@100": 0.18266666666666667,
+      "mean_candidates": 531.9816666666667
+    },
+    {
+      "channel": "semantic",
+      "num_users": 3000,
+      "Recall@20": 0.042333333333333334,
+      "Recall@50": 0.06066666666666667,
+      "Recall@100": 0.08866666666666667,
+      "mean_candidates": 1000.0
+    },
+    {
+      "channel": "merged",
+      "num_users": 3000,
+      "Recall@20": 0.08533333333333333,
+      "Recall@50": 0.13133333333333333,
+      "Recall@100": 0.16333333333333333,
+      "mean_candidates": 2347.981
+    }
+  ],
+  "unique_hits": {
+    "popular": 193,
+    "itemcf": 332,
+    "semantic": 303
+  },
+  "overlaps": {
+    "popular|itemcf": {
+      "both": 114,
+      "union": 1056,
+      "jaccard": 0.10795454545454546
+    },
+    "popular|semantic": {
+      "both": 88,
+      "union": 1027,
+      "jaccard": 0.08568646543330087
+    },
+    "itemcf|semantic": {
+      "both": 455,
+      "union": 1166,
+      "jaccard": 0.3902229845626072
+    }
+  },
+  "merged_targets_found": 1359,
+  "generative_detail": null,
+  "merged_by_bucket": [
+    {
+      "bucket": "head",
+      "num_users": 987,
+      "Recall@20": 0.08713272543059777,
+      "Recall@50": 0.1408308004052685,
+      "Recall@100": 0.17325227963525835
+    },
+    {
+      "bucket": "middle",
+      "num_users": 692,
+      "Recall@20": 0.07514450867052024,
+      "Recall@50": 0.12138728323699421,
+      "Recall@100": 0.15173410404624277
+    },
+    {
+      "bucket": "tail",
+      "num_users": 1321,
+      "Recall@20": 0.08932626797880394,
+      "Recall@50": 0.12944738834216502,
+      "Recall@100": 0.161998485995458
+    }
+  ],
+  "pool_size": {
+    "mean": 2347.981,
+    "min": 1867,
+    "max": 2905
+  },
+  "eval_time_s": 134.1,
+  "note": "candidate generation quality; the user's own history is always excluded"
+}

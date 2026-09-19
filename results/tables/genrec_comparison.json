@@ -1,0 +1,131 @@
+{
+  "processed_dir": "data/processed/base",
+  "num_users": 3000,
+  "ks": [
+    20,
+    50,
+    100
+  ],
+  "per_source_k": 1000,
+  "channels": [
+    {
+      "channel": "popular",
+      "num_users": 3000,
+      "Recall@20": 0.002,
+      "Recall@50": 0.007666666666666666,
+      "Recall@100": 0.013,
+      "mean_candidates": 1000.0
+    },
+    {
+      "channel": "itemcf",
+      "num_users": 3000,
+      "Recall@20": 0.102,
+      "Recall@50": 0.14133333333333334,
+      "Recall@100": 0.18266666666666667,
+      "mean_candidates": 531.9816666666667
+    },
+    {
+      "channel": "semantic",
+      "num_users": 3000,
+      "Recall@20": 0.042333333333333334,
+      "Recall@50": 0.06066666666666667,
+      "Recall@100": 0.08866666666666667,
+      "mean_candidates": 1000.0
+    },
+    {
+      "channel": "generative",
+      "num_users": 3000,
+      "Recall@20": 0.06433333333333334,
+      "Recall@50": 0.098,
+      "Recall@100": 0.13333333333333333,
+      "mean_candidates": 99.34033333333333
+    },
+    {
+      "channel": "merged",
+      "num_users": 3000,
+      "Recall@20": 0.09133333333333334,
+      "Recall@50": 0.14033333333333334,
+      "Recall@100": 0.18466666666666667,
+      "mean_candidates": 2382.5183333333334
+    }
+  ],
+  "unique_hits": {
+    "popular": 152,
+    "itemcf": 292,
+    "semantic": 277,
+    "generative": 53
+  },
+  "overlaps": {
+    "popular|itemcf": {
+      "both": 114,
+      "union": 1056,
+      "jaccard": 0.10795454545454546
+    },
+    "popular|semantic": {
+      "both": 88,
+      "union": 1027,
+      "jaccard": 0.08568646543330087
+    },
+    "popular|generative": {
+      "both": 130,
+      "union": 602,
+      "jaccard": 0.2159468438538206
+    },
+    "itemcf|semantic": {
+      "both": 455,
+      "union": 1166,
+      "jaccard": 0.3902229845626072
+    },
+    "itemcf|generative": {
+      "both": 272,
+      "union": 966,
+      "jaccard": 0.2815734989648033
+    },
+    "semantic|generative": {
+      "both": 239,
+      "union": 944,
+      "jaccard": 0.2531779661016949
+    }
+  },
+  "merged_targets_found": 1412,
+  "generative_detail": {
+    "beam_width": 100,
+    "empty_decodings": 0,
+    "mean_candidates": 99.34033333333333,
+    "min_candidates": 65,
+    "max_candidates": 107,
+    "users_with_zero_candidates": 0,
+    "decode_time_s": 1102.2,
+    "ms_per_user": 367.41
+  },
+  "merged_by_bucket": [
+    {
+      "bucket": "head",
+      "num_users": 987,
+      "Recall@20": 0.14184397163120568,
+      "Recall@50": 0.20466058763931105,
+      "Recall@100": 0.24924012158054712
+    },
+    {
+      "bucket": "middle",
+      "num_users": 692,
+      "Recall@20": 0.07803468208092486,
+      "Recall@50": 0.1199421965317919,
+      "Recall@100": 0.16184971098265896
+    },
+    {
+      "bucket": "tail",
+      "num_users": 1321,
+      "Recall@20": 0.06056018168054504,
+      "Recall@50": 0.10295230885692658,
+      "Recall@100": 0.14837244511733536
+    }
+  ],
+  "pool_size": {
+    "mean": 2382.5183333333334,
+    "min": 1884,
+    "max": 2976
+  },
+  "eval_time_s": 145.7,
+  "note": "candidate generation quality; the user's own history is always excluded"
+}

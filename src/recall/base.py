@@ -35,16 +35,25 @@ PAD = 0
 
 @dataclass(frozen=True)
 class RecallCandidate:
-    """One recalled item, produced by one channel."""
+    """One recalled item, produced by one channel.
+
+    ``extra`` carries channel-specific evidence (e.g. the Semantic ID and beam
+    rank for generative recall) so the Inspector can explain *how* an item was
+    produced without every channel having to widen the shared interface.
+    """
 
     item_id: int  # internal id, 1..num_items
     score: float
     source: str
     rank: int  # 1-based rank inside this channel's own list
+    extra: dict = field(default_factory=dict)
 
     def as_dict(self) -> dict:
-        return {"item_id": self.item_id, "score": float(self.score),
-                "source": self.source, "rank": int(self.rank)}
+        out = {"item_id": self.item_id, "score": float(self.score),
+               "source": self.source, "rank": int(self.rank)}
+        if self.extra:
+            out["extra"] = self.extra
+        return out
 
 
 @dataclass

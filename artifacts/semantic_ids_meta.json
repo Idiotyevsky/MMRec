@@ -1,0 +1,22 @@
+{
+  "source_artifact": "artifacts/semantic_ids_content.npz",
+  "rqvae_checkpoint": "artifacts/rqvae_content.pt",
+  "rqvae_checkpoint_sha16": "363bfeaf23ce8a85",
+  "processed_dir": "data/processed/base",
+  "dataset_hash": "0adda2473b13c475",
+  "semantic_id_hash": "ee98f46cb66193e0",
+  "modalities": [
+    "text",
+    "image"
+  ],
+  "num_items": 19738,
+  "num_levels": 4,
+  "codebook_size": 256,
+  "collision_rate": 0.0023305299422433645,
+  "unique_semantic_ids": 19692,
+  "id_spaces": {
+    "internal_item_id": "1..N model index space, 0 is PAD",
+    "raw_item_id": "MicroLens id used by the API and the UI",
+    "codes": "semantic id, row i belongs to internal_item_id i+1"
+  }
+}

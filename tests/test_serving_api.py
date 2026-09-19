@@ -152,3 +152,56 @@ def test_legacy_recommend_endpoint(client):
     body = r.json()
     assert "items" in body and "latency_ms" in body
     assert len(body["items"]) <= 3
+
+
+# ----------------------------------------------------------------------
+# generative channel is opt-in
+# ----------------------------------------------------------------------
+def _service(root, synthetic_dir, synthetic_recall_artifacts, synthetic_run, **kw):
+    return ShortRecService(
+        processed_dir=str(synthetic_dir),
+        cold_processed_dir="does/not/exist",
+        device="cpu",
+        default_ranker="sasrec",
+        root=root,
+        ranker_specs={"sasrec": RankerSpec("sasrec", synthetic_run, description="ID-only")},
+        feature_dir=str(synthetic_dir),
+        **kw,
+    )
+
+
+@pytest.fixture()
+def bare_root(synthetic_dir, synthetic_recall_artifacts, tmp_path):
+    (tmp_path / "artifacts").mkdir(parents=True, exist_ok=True)
+    np.savez_compressed(tmp_path / "artifacts" / "itemcf_neighbors.npz",
+                        **dict(np.load(synthetic_recall_artifacts["itemcf"])))
+    np.save(tmp_path / "artifacts" / "content_embeddings.npy",
+            np.load(synthetic_recall_artifacts["content"]))
+    (tmp_path / "data").mkdir(parents=True, exist_ok=True)
+    return tmp_path
+
+
+def test_generative_channel_is_off_by_default(bare_root, synthetic_dir,
+                                              synthetic_recall_artifacts, synthetic_run):
+    svc = _service(bare_root, synthetic_dir, synthetic_recall_artifacts, synthetic_run)
+    assert svc.generative is None
+    assert "generative" not in svc.merger.source_names
+
+
+def test_missing_generative_checkpoint_degrades_gracefully(
+        bare_root, synthetic_dir, synthetic_recall_artifacts, synthetic_run):
+    svc = _service(bare_root, synthetic_dir, synthetic_recall_artifacts, synthetic_run,
+                   generative_checkpoint="artifacts/nope.pt")
+    assert svc.generative is None
+    assert "generative" not in svc.merger.source_names
+    # the rest of the service still works
+    assert svc.channel_status["popular"] == (True, "loaded")
+
+
+def test_corrupt_generative_checkpoint_does_not_break_the_service(
+        bare_root, synthetic_dir, synthetic_recall_artifacts, synthetic_run):
+    (bare_root / "artifacts" / "bad.pt").write_bytes(b"not a checkpoint")
+    svc = _service(bare_root, synthetic_dir, synthetic_recall_artifacts, synthetic_run,
+                   generative_checkpoint="artifacts/bad.pt")
+    assert svc.generative is None
+    assert "popular" in svc.merger.source_names

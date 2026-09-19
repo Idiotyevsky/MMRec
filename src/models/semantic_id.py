@@ -117,20 +117,149 @@ class SemanticIDMapper:
         return extra
 
 
-class PrefixConstraint:
-    """Trie-like constraint used during autoregressive decoding."""
+class TrieNode:
+    """One node of the Semantic-ID trie."""
+
+    __slots__ = ("children", "items", "depth")
+
+    def __init__(self, depth: int) -> None:
+        self.children: dict[int, "TrieNode"] = {}
+        self.items: list[int] = []  # items whose SID *ends* here
+        self.depth = depth
+
+
+class SemanticTrie:
+    """Explicit prefix tree over Semantic IDs.
+
+    Constrained decoding needs one question answered at every step: *which codes
+    may legally follow this prefix?*  A flat prefix->codes dict answers it, but
+    building the tree makes the structure inspectable (depth, branching, leaf
+    sizes) and lets ``validate`` prove that the trie and the mapper agree.
+    """
 
     def __init__(self, mapper: SemanticIDMapper) -> None:
         self.mapper = mapper
+        self.root = TrieNode(0)
+        self._num_nodes = 1
+        self._num_leaves = 0
+        for sid, items in mapper.sid_to_items.items():
+            node = self.root
+            for code in sid:
+                child = node.children.get(int(code))
+                if child is None:
+                    child = TrieNode(node.depth + 1)
+                    node.children[int(code)] = child
+                    self._num_nodes += 1
+                node = child
+            if not node.items:
+                self._num_leaves += 1
+            node.items.extend(int(i) for i in items)
+
+    # ------------------------------------------------------------------
+    def node(self, prefix: tuple | list) -> TrieNode | None:
+        cur = self.root
+        for code in prefix:
+            cur = cur.children.get(int(code))
+            if cur is None:
+                return None
+        return cur
+
+    def allowed_next(self, prefix: tuple | list) -> list[int]:
+        """Token ids that can legally extend ``prefix``."""
+        if len(prefix) >= self.mapper.num_levels:
+            return []
+        node = self.node(prefix)
+        if node is None:
+            return []
+        level = len(prefix)
+        return [self.mapper.token(level, c) for c in sorted(node.children)]
+
+    def is_complete(self, prefix: tuple | list) -> bool:
+        if len(prefix) != self.mapper.num_levels:
+            return False
+        node = self.node(prefix)
+        return node is not None and bool(node.items)
+
+    def items(self, prefix: tuple | list) -> list[int]:
+        node = self.node(prefix)
+        return list(node.items) if node else []
+
+    def items_at_most(self, prefix: tuple | list, max_items: int) -> list[int]:
+        """Items reachable under ``prefix``, truncated to ``max_items``."""
+        node = self.node(prefix)
+        if node is None:
+            return []
+        out: list[int] = []
+        stack = [node]
+        while stack and len(out) < max_items:
+            cur = stack.pop()
+            out.extend(cur.items[: max_items - len(out)])
+            stack.extend(cur.children.values())
+        return out
+
+    # ------------------------------------------------------------------
+    @property
+    def num_nodes(self) -> int:
+        return self._num_nodes
+
+    @property
+    def num_leaves(self) -> int:
+        return self._num_leaves
+
+    def statistics(self) -> dict:
+        depth_counts = [0] * (self.mapper.num_levels + 1)
+        stack = [self.root]
+        while stack:
+            cur = stack.pop()
+            depth_counts[cur.depth] += 1
+            stack.extend(cur.children.values())
+        return {
+            "num_nodes": self._num_nodes,
+            "num_leaves": self._num_leaves,
+            "num_levels": self.mapper.num_levels,
+            "nodes_per_depth": depth_counts,
+            "branching_factor_root": len(self.root.children),
+        }
+
+    def validate(self) -> None:
+        """Assert the trie and the mapper describe the same catalogue."""
+        for sid, items in self.mapper.sid_to_items.items():
+            node = self.node(sid)
+            assert node is not None, f"missing SID {sid}"
+            assert sorted(node.items) == sorted(items), f"item mismatch at {sid}"
+        for item, sid in self.mapper.item_to_sid.items():
+            assert item in self.items(sid), f"item {item} not stored under {sid}"
+        for level in range(self.mapper.num_levels):
+            for node in self._nodes_at(level):
+                for code in node.children:
+                    assert 0 <= code < self.mapper.codebook_size, "code out of range"
+
+    def _nodes_at(self, depth: int) -> list[TrieNode]:
+        out, stack = [], [self.root]
+        while stack:
+            cur = stack.pop()
+            if cur.depth == depth:
+                out.append(cur)
+            elif cur.depth < depth:
+                stack.extend(cur.children.values())
+        return out
+
+
+class PrefixConstraint:
+    """Trie-backed constraint used during autoregressive decoding."""
+
+    def __init__(self, mapper: SemanticIDMapper, trie: SemanticTrie | None = None) -> None:
+        self.mapper = mapper
+        self.trie = trie if trie is not None else SemanticTrie(mapper)
 
     def allowed(self, prefix: list[int]) -> list[int]:
-        sid_prefix = []
+        codes = []
         for pos, t in enumerate(prefix):
             dc = self.mapper.decode_token(t)
             if dc is None or dc[0] != pos:
                 return []
-            sid_prefix.append(dc[1])
-        return self.mapper.allowed_next(tuple(sid_prefix))
+            codes.append(dc[1])
+        return self.trie.allowed_next(codes)
 
     def is_complete(self, tokens: list[int]) -> bool:
         return self.mapper.sid_from_tokens(tokens) is not None

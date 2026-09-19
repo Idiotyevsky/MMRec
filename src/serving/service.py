@@ -50,6 +50,9 @@ class ShortRecService:
         feature_dir: str = "data/raw",
         root: str | Path | None = None,
         ranker_specs: dict[str, RankerSpec] | None = None,
+        generative_checkpoint: str | None = None,
+        generative_beam: int = 20,
+        semantic_ids: str = "artifacts/semantic_ids.npz",
     ) -> None:
         # `root` and `ranker_specs` exist so tests can point the whole service at
         # a synthetic dataset instead of the real MicroLens artifacts.
@@ -81,7 +84,12 @@ class ShortRecService:
         else:
             LOG.warning(f"content embeddings missing at {emb_path}; channel disabled")
             self.content_embeddings = None
+        self.generative = self._load_generative(
+            generative_checkpoint, generative_beam, semantic_ids)
+        if self.generative is not None:
+            strategies.append(self.generative)
         self.merger = CandidateMerger(strategies)
+        self.channel_status = {name: (True, "loaded") for name in self.merger.source_names}
 
         # ---- rankers ----
         specs: dict[str, RankerSpec] = (ranker_specs if ranker_specs is not None
@@ -93,6 +101,7 @@ class ShortRecService:
             )
         self.registry = RankerRegistry(self.data, specs, device=device)
         self.registry.warm()
+
         self.recommender = TwoStageRecommender(
             self.data, self.merger, self.registry,
             default_ranker=default_ranker, history_mode=history_mode,
@@ -118,6 +127,32 @@ class ShortRecService:
         self._cold_ids = (np.flatnonzero(self.cold_data.is_simulated_cold)
                           if self.cold_data is not None else np.zeros(0, dtype=np.int64))
         self._feature_dir = self.root / feature_dir
+
+    def _load_generative(self, checkpoint, beam, semantic_ids):
+        """Optionally attach the Semantic-ID generative channel.
+
+        Off by default: it is an experimental retrieval route, and the two-stage
+        system must behave identically whether or not it is present.  Any failure
+        to load is reported and treated as "channel absent" rather than fatal, so
+        a missing artifact can never take the service down.
+        """
+        if not checkpoint:
+            return None
+        ck = self.root / checkpoint
+        if not ck.exists():
+            LOG.warning(f"generative checkpoint missing at {ck}; channel disabled")
+            return None
+        try:
+            from src.recall.generative import load_generative_recall
+
+            strat = load_generative_recall(
+                ck, self.root / semantic_ids, device=self.device, beam_width=beam)
+        except Exception as exc:  # noqa: BLE001 - surfaced, never fatal
+            LOG.warning(f"generative channel failed to load ({exc}); channel disabled")
+            return None
+        ready, detail = strat.is_ready()
+        LOG.info(f"generative channel enabled: {detail}")
+        return strat if ready else None
 
     # ------------------------------------------------------------------
     # id conversion

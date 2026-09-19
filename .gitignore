@@ -29,6 +29,8 @@ results/legacy_pre_autoregressive_fix/*
 !results/case_study.md
 !results/case_study.json
 !artifacts/semantic_ids_*.npz
+# the canonical table (no trailing suffix) that configs/generative_rec.yaml points at
+!artifacts/semantic_ids.npz
 !artifacts/semantic_id_report_*.json
 !artifacts/rqvae_sweep_*.json
 !artifacts/smoke_test_results.json

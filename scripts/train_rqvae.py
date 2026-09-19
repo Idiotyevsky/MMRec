@@ -31,7 +31,7 @@ from src.data.dataset import ProcessedData  # noqa: E402
 from src.models.rqvae import RQVAE  # noqa: E402
 from src.models.semantic_id import SemanticIDMapper  # noqa: E402
 from src.training.factory import build_model  # noqa: E402
-from src.utils.config import Config  # noqa: E402
+from src.utils.config import Config, add_config_flag  # noqa: E402
 from src.utils.io import save_json  # noqa: E402
 from src.utils.seed import set_seed  # noqa: E402
 
@@ -75,6 +75,22 @@ def load_item_embeddings(args, data: ProcessedData) -> tuple[np.ndarray, str]:
     raise SystemExit(f"unknown --source {args.source!r}")
 
 
+RQVAE_CONFIG_MAP = {
+    "latent_dim": "model.latent_size",
+    "num_codebooks": "model.num_levels",
+    "codebook_size": "model.codebook_size",
+    "hidden_dim": "model.hidden_size",
+    "epochs": "training.epochs",
+    "batch_size": "training.batch_size",
+    "lr": "training.learning_rate",
+    "commitment": "loss.commitment_weight",
+    "seed": "training.seed",
+    "processed_dir": "data.processed_dir",
+    "feature_dir": "data.feature_dir",
+    "run_dir": "output.run_dir",
+}
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--source", default="text_image", choices=["text_image", "run"])
@@ -93,6 +109,9 @@ def main() -> None:
     ap.add_argument("--reseed-every", type=int, default=50)
     ap.add_argument("--seed", type=int, default=42)
     ap.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
+    # applied last: argparse's add_argument(default=...) would otherwise
+    # clobber any default set before the flag is declared
+    add_config_flag(ap, RQVAE_CONFIG_MAP)
     args = ap.parse_args()
 
     set_seed(args.seed)

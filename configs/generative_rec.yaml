@@ -1,0 +1,40 @@
+# Generative retrieval over Semantic IDs
+#
+# Autoregressive decoder over the RQ-VAE token vocabulary.  The item catalogue
+# is never scored against a vector index: the model emits a Semantic ID token by
+# token, and decoding is constrained by the Semantic-ID trie so only code tuples
+# that exist in the catalogue can be produced.
+model:
+  name: generative_rec
+  hidden_size: 192
+  num_layers: 3
+  num_heads: 6
+  dropout: 0.1
+
+data:
+  processed_dir: data/processed/base
+  # must match the RQ-VAE artifact; the checkpoint stores its hash and the
+  # loader refuses to pair a model with a different Semantic-ID table
+  semantic_ids: artifacts/semantic_ids.npz
+  max_items: 20          # history truncation, in items (x num_levels tokens)
+
+training:
+  batch_size: 512
+  learning_rate: 0.001
+  weight_decay: 0.0001
+  amp: true
+  epochs: 120
+  early_stopping_patience: 25
+  monitor: Recall@20
+  monitor_mode: max
+  eval_users: 3000
+  seed: 42
+
+inference:
+  # beam width caps how many candidate Semantic IDs can be produced, so it is
+  # also the ceiling on this channel's candidate budget
+  beam_width: 20
+  eval_beam_width: 100
+
+output:
+  run_dir: results/runs/genrec_sid

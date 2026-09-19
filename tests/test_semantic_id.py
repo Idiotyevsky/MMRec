@@ -166,3 +166,143 @@ def test_generative_model_trains_and_generates(toy_codes):
     assert float(loss) < first
     out = model.generate([[m.item_tokens(1), m.item_tokens(3)]], m, beam_width=2, batch_size=1)
     assert out[0]
+
+
+# ----------------------------------------------------------------------
+# Semantic trie
+# ----------------------------------------------------------------------
+def test_trie_mirrors_the_mapper(toy_codes):
+    from src.models.semantic_id import SemanticTrie
+    m = SemanticIDMapper(toy_codes, num_items=4, codebook_size=16)
+    trie = SemanticTrie(m)
+    trie.validate()
+    assert trie.num_leaves == 3  # 3 unique SIDs
+    assert sorted(trie.root.children) == [0, 3, 6]  # one child per level-1 code
+    assert trie.items((0, 1, 2)) == [1, 3]
+    assert trie.items((9, 9, 9)) == []
+
+
+def test_trie_allowed_next_matches_mapper(toy_codes):
+    from src.models.semantic_id import SemanticTrie
+    m = SemanticIDMapper(toy_codes, num_items=4, codebook_size=16)
+    trie = SemanticTrie(m)
+    assert trie.allowed_next(()) == m.allowed_next(())
+    assert trie.allowed_next((0,)) == m.allowed_next((0,))
+    assert trie.allowed_next((0, 1)) == m.allowed_next((0, 1))
+    assert trie.allowed_next((0, 1, 2)) == []  # terminal
+    assert trie.allowed_next((9,)) == []
+
+
+def test_trie_rejects_incomplete_and_unknown_prefixes(toy_codes):
+    from src.models.semantic_id import SemanticTrie
+    m = SemanticIDMapper(toy_codes, num_items=4, codebook_size=16)
+    trie = SemanticTrie(m)
+    assert trie.is_complete((0, 1, 2)) is True
+    assert trie.is_complete((0, 1)) is False       # too short
+    assert trie.is_complete((0, 1, 9)) is False    # unknown path
+    assert trie.node((0, 1, 9)) is None
+
+
+def test_trie_statistics_are_consistent(toy_codes):
+    from src.models.semantic_id import SemanticTrie
+    m = SemanticIDMapper(toy_codes, num_items=4, codebook_size=16)
+    trie = SemanticTrie(m)
+    stats = trie.statistics()
+    assert stats["num_levels"] == 3
+    assert stats["nodes_per_depth"][0] == 1
+    assert sum(stats["nodes_per_depth"]) == trie.num_nodes
+    assert trie.num_nodes >= trie.num_leaves
+
+
+def test_trie_items_at_most_respects_the_budget(toy_codes):
+    from src.models.semantic_id import SemanticTrie
+    m = SemanticIDMapper(toy_codes, num_items=4, codebook_size=16)
+    trie = SemanticTrie(m)
+    got = trie.items_at_most((), 2)
+    assert len(got) == 2 and len(set(got)) == 2  # budget capped, no repeats
+    assert set(got) <= {1, 2, 3, 4}
+    assert len(trie.items_at_most((), 100)) == 4
+
+
+def test_prefix_constraint_uses_a_supplied_trie(toy_codes):
+    from src.models.semantic_id import SemanticTrie
+    m = SemanticIDMapper(toy_codes, num_items=4, codebook_size=16)
+    trie = SemanticTrie(m)
+    pc = PrefixConstraint(m, trie=trie)
+    assert pc.trie is trie
+    assert pc.allowed([m.token(0, 0)]) == trie.allowed_next((0,))
+    assert pc.allowed([999]) == []  # token from the wrong level
+    assert pc.is_complete(m.item_tokens(1)) is True
+
+
+# ----------------------------------------------------------------------
+# neighbour agreement: the metric that decides whether the hierarchy is real
+# ----------------------------------------------------------------------
+def _neighbour_rows(codes, embeddings, **kw):
+    """Prepend the PAD row: row 0 of the embedding table is PAD, by contract."""
+    from scripts.analyze_semantic_ids import neighbour_agreement_rows
+    m = SemanticIDMapper(codes, num_items=codes.shape[0], codebook_size=16)
+    table = np.vstack([np.zeros((1, embeddings.shape[1]), dtype=np.float32), embeddings])
+    return {r["prefix_length"]: r for r in neighbour_agreement_rows(m, table, **kw)}
+
+
+def test_neighbour_agreement_is_high_when_codes_track_content():
+    """Two well-separated content clusters, codes aligned with the clusters."""
+    rng = np.random.default_rng(0)
+    n_per = 40
+    a = rng.normal(0.0, 0.02, size=(n_per, 8)) + np.eye(8)[0]
+    b = rng.normal(0.0, 0.02, size=(n_per, 8)) - np.eye(8)[0]
+    emb = np.vstack([a, b]).astype(np.float32)
+    # rows 1..40 are cluster a, rows 41..80 are cluster b, so the codes have to be
+    # blocked the same way -- an alternating pattern would not track the content
+    codes = np.array([[0, 0]] * n_per + [[1, 1]] * n_per, dtype=np.int64)
+    rows = _neighbour_rows(codes, emb, n_items=80, k_nn=5)
+    assert rows[1]["share_sharing_prefix"] > 0.95
+    assert rows[1]["lift_vs_chance"] > 10
+
+
+def test_neighbour_agreement_is_at_chance_for_uninformative_codes():
+    """Same content, codes assigned at random: the metric must not invent signal."""
+    rng = np.random.default_rng(0)
+    emb = rng.normal(size=(200, 8)).astype(np.float32)
+    codes = rng.integers(0, 16, size=(200, 2)).astype(np.int64)
+    rows = _neighbour_rows(codes, emb, n_items=200, k_nn=5)
+    assert rows[1]["chance_rate"] == pytest.approx(1 / 16)
+    # allow generous slack: 200 items is a small sample
+    assert rows[1]["share_sharing_prefix"] < 4 * rows[1]["chance_rate"]
+
+
+def test_pad_content_does_not_affect_neighbour_agreement():
+    """PAD (row 0) is excluded by construction, so its value must not matter.
+
+    A differential test rather than an absolute one: making PAD a near-duplicate
+    of a real item would corrupt every neighbour list if the exclusion were
+    missing, so the two runs below would disagree.
+    """
+    from scripts.analyze_semantic_ids import neighbour_agreement_rows
+    rng = np.random.default_rng(0)
+    n = 40
+    body = rng.normal(size=(n, 8)).astype(np.float32)
+    codes = np.array([[0, 0]] * (n // 2) + [[1, 1]] * (n // 2), dtype=np.int64)
+    m = SemanticIDMapper(codes, num_items=n, codebook_size=16)
+
+    zero_pad = np.vstack([np.zeros((1, 8), dtype=np.float32), body])
+    # PAD made identical to item 1: it would be the nearest neighbour of everything
+    hostile_pad = np.vstack([body[0:1].copy(), body])
+
+    a = {r["prefix_length"]: r["share_sharing_prefix"]
+         for r in neighbour_agreement_rows(m, zero_pad, n_items=n, k_nn=3)}
+    b = {r["prefix_length"]: r["share_sharing_prefix"]
+         for r in neighbour_agreement_rows(m, hostile_pad, n_items=n, k_nn=3)}
+    assert a == b
+
+
+def test_neighbour_agreement_reports_its_own_sample_size():
+    rng = np.random.default_rng(0)
+    emb = rng.normal(size=(50, 4)).astype(np.float32)
+    codes = rng.integers(0, 4, size=(50, 2)).astype(np.int64)
+    rows = _neighbour_rows(codes, emb, n_items=20, k_nn=3)
+    r = rows[1]
+    assert r["num_items_sampled"] == 20
+    assert r["num_pairs"] == 60
+    assert 0.0 <= r["share_sharing_prefix"] <= 1.0

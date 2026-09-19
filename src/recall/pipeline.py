@@ -110,12 +110,15 @@ class CandidateMerger:
                 if entry is None:
                     entry = MergedCandidate(item_id=c.item_id)
                     merged[c.item_id] = entry
-                entry.sources.append({
+                trace = {
                     "name": name,
                     "score": float(c.score),
                     "rank": int(c.rank),
                     "norm_score": float(norm),
-                })
+                }
+                if c.extra:
+                    trace["extra"] = c.extra
+                entry.sources.append(trace)
                 entry.merge_score += 1.0 / (self.rrf_k + c.rank)
 
         ordered = sorted(merged.values(), key=lambda c: (-c.merge_score, c.item_id))

@@ -1,0 +1,6 @@
+prefix_length,scope,num_groups,num_items_with_partner,num_pairs,mean_cosine,median_cosine,mean_cosine_lift
+1,same_prefix,256,19724,78896,0.174737,0.162373,0.000702
+2,same_prefix,14186,9244,36976,0.172843,0.160226,-0.001192
+3,same_prefix,19513,420,1680,0.188453,0.180546,0.014418
+4,same_prefix,19692,84,336,0.202913,0.18775,0.028878
+0,random_pairs,1,19738,200000,0.174035,0.162002,0.0
