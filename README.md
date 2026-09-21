@@ -210,20 +210,21 @@ model matrix is under [Detailed Experiments](#detailed-experiments).
 
 ### Recall
 
-Historical shared-loop candidate-generation quality over 100 000 users, history
-masked. These are the original Popular + ItemCF + Semantic channels and their
-RRF pool; the Two-Tower standalone result below is deliberately not folded into
-this table before the shared-loop rerun completes.
+Shared-loop candidate-generation quality over 100 000 users, history masked.
+Two-Tower is now measured in the same execution path as Popular, ItemCF and
+Semantic; the RRF row remains an equal-over-fetch result, not a fixed-allocation
+fusion ablation.
 
 <!-- TABLE:RECALL -->
-| Channel | Recall@100 | Recall@200 | Recall@500 | Recall@1000 |
-|---|---|---|---|---|
-| popular | 0.0170 | 0.0299 | 0.0625 | 0.1071 |
-| itemcf | 0.1487 | 0.1852 | 0.2376 | 0.2479 |
-| semantic | 0.0732 | 0.1004 | 0.1555 | 0.2225 |
-| merged | 0.1269 | 0.1652 | 0.2327 | 0.3004 |
+| Channel | Recall@100 | Recall@200 | Recall@500 | Recall@1000 | Candidates/user |
+|---|---|---|---|---|---|
+| popular | 0.0170 | 0.0299 | 0.0625 | 0.1071 | 1000.0 |
+| itemcf | 0.1487 | 0.1852 | 0.2376 | 0.2479 | 476.9 |
+| semantic | 0.0732 | 0.1004 | 0.1555 | 0.2225 | 1000.0 |
+| two_tower | 0.2550 | 0.3405 | 0.4779 | 0.5987 | 1000.0 |
+| merged | 0.2075 | 0.2643 | 0.3675 | 0.4665 | 2966.9 |
 
-_Test target, user history masked, 100000 users. Candidate-generation quality: this is the ceiling the ranker can reach._
+_Test target, user history masked, 100000 users (shared Four-channel loop). Candidate-generation quality: this is the ceiling the ranker can reach._
 <!-- /TABLE:RECALL -->
 
 ### Learned Retrieval: Content-aware Two-Tower
@@ -263,16 +264,28 @@ L_t=-\log\frac{\exp(u_t^\top v^+/\tau)}{\exp(u_t^\top v^+/\tau)+\sum_j\exp(u_t^\
 |---|---|---|---|---|
 | Two-Tower | 0.2550 | 0.3405 | 0.4779 | 0.5987 |
 
-_Standalone full-catalog retrieval on the base test protocol, 100000 users. The strict final cross-channel comparison is still being rerun inside the shared `scripts/evaluate_recall.py` candidate-generation loop, so this row is not merged into the historical multi-channel table above._
+_Standalone full-catalog retrieval on the base test protocol, 100000 users. The completed shared-loop table above reports the same Two-Tower retrieval values alongside every recall channel._
 <!-- /TABLE:TWO_TOWER -->
 
-In the completed standalone retrieval run, the learned Two-Tower reaches 0.5987
-Recall@1000, above the previously reported single-channel ItemCF and
-training-free Semantic values. That is not yet the final apples-to-apples
-cross-channel claim: the shared `evaluate_recall.py` candidate-generation loop
-is being rerun so each channel follows exactly the same execution path. Detailed
-cross-channel, overlap, cold/tail and fixed-budget results remain
+In the completed standalone and shared-loop runs, the learned Two-Tower reaches
+0.5987 Recall@1000, above ItemCF and training-free Semantic. The completed
+shared-loop result establishes the single-channel comparison; fixed-budget RRF,
+overlap, cold/tail and pipeline allocation analysis remain
 [artifact-gated](docs/two_tower_findings.md).
+
+#### Two-Tower in the retrieval → ranking pipeline
+
+<!-- TABLE:TWO_TOWER_PIPELINE -->
+| Candidate budget | Candidate recall | Pipeline Recall@20 | Pipeline NDCG@20 | Recall retention |
+|---|---|---|---|---|
+| 100 | 0.2061 | 0.1409 | 0.0663 | 1.009 |
+| 200 | 0.2611 | 0.1459 | 0.0673 | 1.045 |
+| 500 | 0.3662 | 0.1439 | 0.0662 | 1.031 |
+| 1000 | 0.4658 | 0.1424 | 0.0655 | 1.020 |
+| 2000 | 0.5880 | 0.1406 | 0.0648 | 1.007 |
+
+_Four-channel RRF: `popular+itemcf+semantic+two_tower`; 10000 fixed test users, final candidate budget as shown, and per-source over-fetch = 1000. A fixed-allocation ablation remains necessary before attributing RRF gains to an individual source._
+<!-- /TABLE:TWO_TOWER_PIPELINE -->
 
 ### Why multi-channel recall
 

@@ -2,9 +2,8 @@
 
 This document is intentionally artifact-gated. A completed base-split
 standalone full-catalog retrieval run is recorded in
-`results/tables/two_tower_standalone.csv`; it remains separate from the shared
-candidate-generation comparison until every channel has been rerun through the
-same loop.
+`results/tables/two_tower_standalone.csv`. The completed shared-loop comparison
+is recorded in `results/tables/two_tower_recall.csv`.
 
 The implemented route is retrieval: a 128-D user query is matched against
 precomputed, L2-normalized 128-D item vectors with exact inner product.  The
@@ -14,7 +13,8 @@ Semantic Recall is training-free recency-weighted content similarity; Two-Tower
 uses train-prefix next-item supervision to adapt both content projections and
 the user projection. The base test standalone result is Recall@100/200/500/1000
 = 0.2550 / 0.3405 / 0.4779 / 0.5987 (100,000 users). It is not presented as a
-final apples-to-apples comparison with the historical shared-loop rows.
+final fixed-allocation RRF comparison; its single-channel values match the
+shared-loop run.
 
 To generate evidence, train and export first:
 

@@ -71,6 +71,10 @@ def build(args, data: ProcessedData):
         strategies.append(SemanticRecall(np.load(emb_path), data.num_items))
     else:
         LOG.warning(f"content embeddings missing at {emb_path}")
+    if args.two_tower_run:
+        from src.recall.two_tower import load_two_tower_recall
+        strategies.append(load_two_tower_recall(ROOT / args.two_tower_run, data,
+                                                device=args.two_tower_device))
     merger = CandidateMerger(strategies)
 
     specs = {}
@@ -89,6 +93,9 @@ def main() -> None:
     ap.add_argument("--processed-dir", default="data/processed/base")
     ap.add_argument("--itemcf-index", default="artifacts/itemcf_neighbors.npz")
     ap.add_argument("--content-embeddings", default="artifacts/content_embeddings.npy")
+    ap.add_argument("--two-tower-run", default=None,
+                    help="finished Two-Tower run; adds the learned retrieval channel")
+    ap.add_argument("--two-tower-device", default="cpu")
     ap.add_argument("--sasrec-run", default=None, help="default: newest finished 'sasrec' run")
     ap.add_argument("--mm-run", default=None, help="default: newest finished 'mm_concat' run")
     ap.add_argument("--ranker", default="mm_concat")
@@ -100,6 +107,7 @@ def main() -> None:
     ap.add_argument("--device", default="cpu")
     ap.add_argument("--out", default="results/tables/pipeline_tradeoff.csv")
     ap.add_argument("--source-out", default="results/tables/recall_source_contribution.csv")
+    ap.add_argument("--json-out", default="results/tables/pipeline_tradeoff.json")
     args = ap.parse_args()
 
     configure_threads()
@@ -203,6 +211,8 @@ def main() -> None:
             "recall_retention": pipe_recall / full_recall if full_recall > 0 else None,
             "ndcg_retention": pipe_ndcg / full_ndcg_mean if full_ndcg_mean > 0 else None,
             "mean_pool_size": float(st["pool"].mean()),
+            "recall_sources": "+".join(merger.source_names),
+            "per_source_k": args.recall_k,
         })
         LOG.info(f"cand_k={cand_k:5d}: pool={st['pool'].mean():7.0f} "
                  f"cand_recall={st['cand_hit'].mean():.4f} "
@@ -255,6 +265,7 @@ def main() -> None:
         "eval_seed": int(args.eval_seed),
         "user_subset_hash": uhash,
         "recall_k_per_channel": args.recall_k,
+        "recall_sources": merger.source_names,
         "final_k": args.final_k,
         "full_catalogue": {"Recall@20": full_recall, "NDCG@20": full_ndcg_mean},
         "tradeoff": rows,
@@ -262,7 +273,7 @@ def main() -> None:
         "note": ("pipeline and full-catalogue numbers come from the same checkpoint and "
                  "the same user sample; retention = pipeline / full. Not comparable to "
                  "results/tables/overall.csv, which is a multi-seed full-catalogue mean."),
-    }, ROOT / "results" / "tables" / "pipeline_tradeoff.json")
+    }, ROOT / args.json_out)
     print(f"\nwrote {out} and {sout}")
 
 

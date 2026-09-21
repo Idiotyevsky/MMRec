@@ -63,7 +63,7 @@ def test_two_tower_standalone_table_is_artifact_driven(tables):
     }], fields)
     text = mrt.two_tower_standalone_table()
     assert "0.2550" in text and "0.5987" in text
-    assert "shared `scripts/evaluate_recall.py`" in text
+    assert "completed shared-loop table" in text
 
 
 def test_ordering_claim_comes_from_the_csv(tables):

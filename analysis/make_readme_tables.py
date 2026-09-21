@@ -688,7 +688,9 @@ def findings() -> str:
 
 def recall_table() -> str:
     """Recall@K per channel, from results/tables/recall_eval.csv."""
-    rows = read("recall_eval.csv")
+    # The completed Four-channel run supersedes the historical three-channel
+    # table, but keeps its own artifact so provenance remains inspectable.
+    rows = read("two_tower_recall.csv") or read("recall_eval.csv")
     if not rows:
         return f"_Recall evaluation has not been run yet — {TBD}._"
     ks = sorted({int(k.split("@")[1]) for k in rows[0] if k.startswith("Recall@")})
@@ -703,9 +705,10 @@ def recall_table() -> str:
         body.append(row)
     header = ["Channel"] + [f"Recall@{k}" for k in ks] + (["Candidates/user"] if has_counts else [])
     n = rows[0].get("num_users", TBD)
-    note = ("\n\n_Test target, user history masked, {n} users. Candidate-generation quality: "
-            "this is the ceiling the ranker can reach._".format(n=n))
-    if has_counts:
+    source = "shared Four-channel loop" if any(r.get("channel") == "two_tower" for r in rows) else "shared recall loop"
+    note = ("\n\n_Test target, user history masked, {n} users ({source}). Candidate-generation quality: "
+            "this is the ceiling the ranker can reach._".format(n=n, source=source))
+    if has_counts and any(r.get("channel") == "generative" for r in rows):
         note += (" A channel whose candidate count is below a given K cannot exceed its own "
                  "budget at that K; the generative row is capped by its beam width.")
     return md_table(header, body) + note
@@ -727,12 +730,25 @@ def two_tower_standalone_table() -> str:
     body = [["Two-Tower", *[fmt(row.get(f"Recall@{k}")) for k in ks]]]
     note = (
         "_Standalone full-catalog retrieval on the base test protocol, "
-        f"{row.get('num_users', TBD)} users. The strict final cross-channel comparison is "
-        "still being rerun inside the shared `scripts/evaluate_recall.py` "
-        "candidate-generation loop, so this row is not merged into the historical "
-        "multi-channel table above._"
+        f"{row.get('num_users', TBD)} users. The completed shared-loop table above "
+        "reports the same Two-Tower retrieval values alongside every recall channel._"
     )
     return md_table(["Channel", *[f"Recall@{k}" for k in ks]], body) + "\n\n" + note
+
+
+def two_tower_pipeline_table() -> str:
+    """Four-channel pipeline trade-off, separately versioned from the old run."""
+    rows = read("two_tower_pipeline_tradeoff.csv")
+    if not rows:
+        return f"_No completed Two-Tower pipeline artifact — {TBD}._"
+    body = [[r["candidate_k"], fmt(r.get("candidate_recall")),
+             fmt(r.get("pipeline_Recall@20")), fmt(r.get("pipeline_NDCG@20")),
+             fmt(r.get("recall_retention"), 3)] for r in rows]
+    note = (f"_Four-channel RRF: `{rows[0].get('recall_sources', TBD)}`; "
+            f"{rows[0].get('num_users', TBD)} fixed test users, final candidate budget as shown, "
+            f"and per-source over-fetch = {rows[0].get('per_source_k', TBD)}. "
+            "A fixed-allocation ablation remains necessary before attributing RRF gains to an individual source._")
+    return md_table(["Candidate budget", "Candidate recall", "Pipeline Recall@20", "Pipeline NDCG@20", "Recall retention"], body) + "\n\n" + note
 
 
 def pipeline_table() -> str:
@@ -1106,6 +1122,7 @@ def main() -> None:
         "OVERALL": overall_table(),
         "RECALL": recall_table(),
         "TWO_TOWER": two_tower_standalone_table(),
+        "TWO_TOWER_PIPELINE": two_tower_pipeline_table(),
         "PIPELINE": pipeline_table(),
         "SOURCES": source_table(),
         "ABLATION": ablation_table(),
