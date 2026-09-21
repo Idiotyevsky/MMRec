@@ -53,6 +53,19 @@ def test_findings_are_empty_until_runs_exist(tables):
     assert "Recall@20" not in text  # no remembered number leaks in
 
 
+def test_two_tower_standalone_table_is_artifact_driven(tables):
+    fields = ["channel", "protocol", "dataset", "num_users", "Recall@100",
+              "Recall@200", "Recall@500", "Recall@1000"]
+    _write(tables, "two_tower_standalone.csv", [{
+        "channel": "two_tower", "protocol": "standalone_full_catalog_retrieval",
+        "dataset": "base", "num_users": "100000", "Recall@100": "0.2550",
+        "Recall@200": "0.3405", "Recall@500": "0.4779", "Recall@1000": "0.5987",
+    }], fields)
+    text = mrt.two_tower_standalone_table()
+    assert "0.2550" in text and "0.5987" in text
+    assert "shared `scripts/evaluate_recall.py`" in text
+
+
 def test_ordering_claim_comes_from_the_csv(tables):
     _write(tables, "overall.csv", [
         _overall_row("popular", "popular", 42, "0.0040", "0.0016"),

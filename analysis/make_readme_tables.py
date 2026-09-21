@@ -711,6 +711,30 @@ def recall_table() -> str:
     return md_table(header, body) + note
 
 
+def two_tower_standalone_table() -> str:
+    """Completed standalone Two-Tower retrieval result, kept separate from RRF.
+
+    This deliberately does not append a row to ``recall_eval.csv``: that table
+    is the shared candidate-generation loop.  Until the shared-loop rerun has
+    finished, combining the two protocols in one table would imply a comparison
+    that has not been run.
+    """
+    rows = read("two_tower_standalone.csv")
+    if not rows:
+        return f"_No completed standalone Two-Tower retrieval artifact — {TBD}._"
+    row = rows[0]
+    ks = [100, 200, 500, 1000]
+    body = [["Two-Tower", *[fmt(row.get(f"Recall@{k}")) for k in ks]]]
+    note = (
+        "_Standalone full-catalog retrieval on the base test protocol, "
+        f"{row.get('num_users', TBD)} users. The strict final cross-channel comparison is "
+        "still being rerun inside the shared `scripts/evaluate_recall.py` "
+        "candidate-generation loop, so this row is not merged into the historical "
+        "multi-channel table above._"
+    )
+    return md_table(["Channel", *[f"Recall@{k}" for k in ks]], body) + "\n\n" + note
+
+
 def pipeline_table() -> str:
     """Two-stage retention: same checkpoint, same user sample, both protocols.
 
@@ -1081,6 +1105,7 @@ def main() -> None:
         "OVERALL_SUMMARY": overall_summary_table(),
         "OVERALL": overall_table(),
         "RECALL": recall_table(),
+        "TWO_TOWER": two_tower_standalone_table(),
         "PIPELINE": pipeline_table(),
         "SOURCES": source_table(),
         "ABLATION": ablation_table(),

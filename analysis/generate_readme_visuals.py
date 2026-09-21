@@ -125,7 +125,7 @@ def _label(x, y, text, size=11, colour=MUTED, weight="700", anchor="start"):
 
 
 def architecture_svg() -> str:
-    W, H = 900, 470
+    W, H = 900, 510
     p = [
         f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W} {H}" width="{W}" '
         f'height="{H}" font-family="{FONT}" role="img" '
@@ -143,32 +143,34 @@ def architecture_svg() -> str:
     p.append(_arrow(178, 70, 214, 70))
     p += _box(216, 44, 156, 52, "Preprocess", "chronological split")
     p.append(_arrow(372, 70, 408, 70))
-    p += _box(410, 26, 190, 44, "Train rankers", "SASRec / MM-SASRec", accent=True)
-    p += _box(410, 78, 190, 40, "ItemCF index", "cosine co-occurrence")
-    p += _box(410, 126, 190, 40, "Content index", "text + image, exact IP")
-    p += _box(654, 78, 150, 44, "artifacts/", "checkpoints, indices")
-    for y in (48, 98, 146):
+    p += _box(410, 18, 190, 44, "Train rankers", "SASRec / MM-SASRec", accent=True)
+    p += _box(410, 70, 190, 40, "Train Two-Tower", "learned retrieval", accent=True)
+    p += _box(410, 118, 190, 40, "ItemCF index", "cosine co-occurrence")
+    p += _box(410, 166, 190, 40, "Content index", "text + image, exact IP")
+    p += _box(654, 92, 150, 44, "artifacts/", "checkpoints, indices")
+    for y in (40, 90, 138, 186):
         p.append(f'  <line x1="600" y1="{y}" x2="648" y2="{y}" stroke="{LINE}" stroke-width="1.4"/>')
-    p.append(f'  <line x1="28" y1="196" x2="872" y2="196" stroke="#E5E7EB" stroke-width="1"/>')
+    p.append(f'  <line x1="28" y1="224" x2="872" y2="224" stroke="#E5E7EB" stroke-width="1"/>')
 
     # ---- online ----
-    p.append(_label(28, 226, "ONLINE · SERVING"))
-    p += _box(28, 242, 150, 52, "User request", "history + user id")
-    p.append(_arrow(103, 294, 103, 322))
+    p.append(_label(28, 254, "ONLINE · SERVING"))
+    p += _box(28, 270, 150, 52, "User request", "history + user id")
+    p.append(_arrow(103, 322, 103, 346))
 
-    p += _box(28, 324, 150, 34, "Popular recall")
-    p += _box(28, 364, 150, 34, "ItemCF recall")
-    p += _box(28, 404, 150, 34, "Semantic recall")
+    p += _box(28, 348, 150, 30, "Popular recall")
+    p += _box(28, 384, 150, 30, "ItemCF recall")
+    p += _box(28, 420, 150, 30, "Semantic recall")
+    p += _box(28, 456, 150, 30, "Two-Tower recall", "learned retrieval", accent=True)
 
-    for y1, y2 in ((341, 372), (381, 372), (421, 372)):
-        p.append(f'  <line x1="178" y1="{y1}" x2="252" y2="{y2}" stroke="{LINE}" stroke-width="1.4"/>')
-    p += _box(254, 350, 158, 46, "Candidate merge", "dedup + RRF", accent=True)
-    p.append(_arrow(412, 373, 446, 373))
-    p += _box(448, 350, 158, 46, "MM-SASRec", "multimodal ranking", accent=True)
-    p.append(_arrow(606, 373, 640, 373))
-    p += _box(642, 350, 138, 46, "Rerank", "exploration quota")
-    p.append(_arrow(711, 396, 711, 424))
-    p += _box(642, 426, 138, 32, "Video feed")
+    for y1 in (363, 399, 435, 471):
+        p.append(f'  <line x1="178" y1="{y1}" x2="252" y2="417" stroke="{LINE}" stroke-width="1.4"/>')
+    p += _box(254, 394, 158, 46, "Candidate merge", "dedup + RRF", accent=True)
+    p.append(_arrow(412, 417, 446, 417))
+    p += _box(448, 394, 158, 46, "MM-SASRec", "multimodal ranking", accent=True)
+    p.append(_arrow(606, 417, 640, 417))
+    p += _box(642, 394, 138, 46, "Rerank", "lightweight serving")
+    p.append(_arrow(711, 440, 711, 466))
+    p += _box(642, 468, 138, 30, "Top-K feed")
 
     p.append("</svg>")
     return "\n".join(p) + "\n"

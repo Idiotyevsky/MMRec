@@ -1,8 +1,10 @@
 # Content-aware Two-Tower findings
 
-This document is intentionally artifact-gated.  No base-data Two-Tower run is
-present in this checkout, so it makes no numerical claim and does not recommend
-changing the serving default.
+This document is intentionally artifact-gated. A completed base-split
+standalone full-catalog retrieval run is recorded in
+`results/tables/two_tower_standalone.csv`; it remains separate from the shared
+candidate-generation comparison until every channel has been rerun through the
+same loop.
 
 The implemented route is retrieval: a 128-D user query is matched against
 precomputed, L2-normalized 128-D item vectors with exact inner product.  The
@@ -10,7 +12,9 @@ item tower has text/image branches and availability bits, but no trainable
 item-ID embedding, so zero-train and simulated-cold items remain encodable.
 Semantic Recall is training-free recency-weighted content similarity; Two-Tower
 uses train-prefix next-item supervision to adapt both content projections and
-the user projection.
+the user projection. The base test standalone result is Recall@100/200/500/1000
+= 0.2550 / 0.3405 / 0.4779 / 0.5987 (100,000 users). It is not presented as a
+final apples-to-apples comparison with the historical shared-loop rows.
 
 To generate evidence, train and export first:
 
@@ -21,8 +25,8 @@ python scripts/evaluate_recall.py --two-tower-run results/runs/two_tower_base \
   --out results/tables/two_tower_recall.csv
 ```
 
-The reported comparison must use the same users, targets, seen masking and
-fixed total candidate budget.  Record Semantic-vs-Two-Tower and
+The final reported comparison must use the same users, targets, seen masking
+and fixed total candidate budget. Record Semantic-vs-Two-Tower and
 ItemCF-vs-Two-Tower hit overlap, Jaccard, mean candidate overlap and unique
 target hits; slice by train-frequency Head/Middle/Tail/Zero-train and run the
 separate `cold10` split for simulated cold.  Until those artifacts exist, the

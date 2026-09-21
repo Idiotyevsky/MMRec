@@ -2,7 +2,7 @@
 
 <p align="center"><strong>Multimodal Two-Stage Recommendation for Short-Video Feeds</strong></p>
 
-<p align="center">Multi-Channel Recall · MM-SASRec · Cold Start</p>
+<p align="center">Multi-Channel Retrieval · Content-aware Two-Tower · MM-SASRec Ranking</p>
 
 <p align="center">
   <a href="#product-demo"><b>Watch Feed</b></a> ·
@@ -81,7 +81,7 @@ the **same checkpoint and the same users** ranked over the whole catalogue.
 
 | Stage | Implementation |
 |---|---|
-| Recall | Popular (training frequency) · ItemCF (cosine co-occurrence) · Semantic (training-free text + image) · optional Two-Tower (behaviour-supervised, content-only item tower; exact inner-product search) |
+| Recall | Popular · ItemCF · Semantic content retrieval · optional content-aware Two-Tower (behaviour-supervised, content-only item tower) |
 | Merge | Reciprocal Rank Fusion over ranks, with every contributing channel kept on the candidate |
 | Rank | MM-SASRec — the user behaviour sequence scored against ID + text + image item representations |
 | Rerank | seen filter · dedup · optional zero-train exploration quota |
@@ -90,6 +90,11 @@ the **same checkpoint and the same users** ranked over the whole catalogue.
 > is the strict model comparison. *Two-stage ranking* scores only recalled
 > candidates and simulates serving. Pipeline numbers are always reported against
 > a same-checkpoint, same-user full-catalogue baseline.
+
+ShortRec uses **two-stage** in the retrieval → ranking sense: `Recall →
+MM-SASRec ranking → lightweight serving rerank`. MicroLens-100K has only about
+19.7K items, so this prototype does not insert a separate industrial pre-ranker;
+at larger scale the usual shape is `Recall → Pre-rank → Rank → Rerank`.
 
 <a id="system-demo"></a>
 
@@ -205,9 +210,10 @@ model matrix is under [Detailed Experiments](#detailed-experiments).
 
 ### Recall
 
-Candidate-generation quality over 100 000 users, history masked — the ceiling the
-ranker can reach. The merged pool beats every single channel, which is the
-argument for multi-channel recall rather than tuning one channel harder.
+Historical shared-loop candidate-generation quality over 100 000 users, history
+masked. These are the original Popular + ItemCF + Semantic channels and their
+RRF pool; the Two-Tower standalone result below is deliberately not folded into
+this table before the shared-loop rerun completes.
 
 <!-- TABLE:RECALL -->
 | Channel | Recall@100 | Recall@200 | Recall@500 | Recall@1000 |
@@ -219,6 +225,69 @@ argument for multi-channel recall rather than tuning one channel harder.
 
 _Test target, user history masked, 100000 users. Candidate-generation quality: this is the ceiling the ranker can reach._
 <!-- /TABLE:RECALL -->
+
+### Learned Retrieval: Content-aware Two-Tower
+
+Two-Tower is an additional learned retrieval channel, not a replacement for
+Semantic Recall or ItemCF. Its Item Tower uses only **384D text** and **768D
+image** features: per-modality projection and fusion produce a **128D
+L2-normalized item embedding**. There is no trainable Item-ID embedding, so an
+unseen or zero-interaction item remains encodable whenever content features are
+available. This keeps the representation compatible with cold-start retrieval;
+it does not itself establish a cold-start gain.
+
+The User Tower maps history items through that same Item Tower, then applies
+recency-weighted pooling and a learned MLP to a 128D normalized user vector.
+Retrieval uses \(s(u,i)=u^\top v_i\); normalization makes this cosine similarity.
+
+Training is next-item retrieval with sampled softmax: `[A] → B`, `[A,B] → C`,
+`[A,B,C] → D`. Each train-prefix uses the next interaction as positive and
+sampled catalogue items as negatives (default: 128 uniform negatives,
+temperature 0.07). Recall@100 is the validation / early-stopping metric, not the
+training loss:
+
+\[
+L_t=-\log\frac{\exp(u_t^\top v^+/\tau)}{\exp(u_t^\top v^+/\tau)+\sum_j\exp(u_t^\top v_j^-/\tau)}.
+\]
+
+| | Semantic Recall | Two-Tower |
+|---|---|---|
+| Supervision | none | user interaction |
+| User representation | recency-weighted content mean | learned user projection |
+| Item representation | fixed text + image vector | learned text + image projection |
+| Item-ID embedding | no | no |
+| Retrieval | exact inner product | exact inner product |
+
+<!-- TABLE:TWO_TOWER -->
+| Channel | Recall@100 | Recall@200 | Recall@500 | Recall@1000 |
+|---|---|---|---|---|
+| Two-Tower | 0.2550 | 0.3405 | 0.4779 | 0.5987 |
+
+_Standalone full-catalog retrieval on the base test protocol, 100000 users. The strict final cross-channel comparison is still being rerun inside the shared `scripts/evaluate_recall.py` candidate-generation loop, so this row is not merged into the historical multi-channel table above._
+<!-- /TABLE:TWO_TOWER -->
+
+In the completed standalone retrieval run, the learned Two-Tower reaches 0.5987
+Recall@1000, above the previously reported single-channel ItemCF and
+training-free Semantic values. That is not yet the final apples-to-apples
+cross-channel claim: the shared `evaluate_recall.py` candidate-generation loop
+is being rerun so each channel follows exactly the same execution path. Detailed
+cross-channel, overlap, cold/tail and fixed-budget results remain
+[artifact-gated](docs/two_tower_findings.md).
+
+### Why multi-channel recall
+
+The channels encode different inductive biases: Popular supplies a popularity
+prior; ItemCF uses collaborative co-occurrence; Semantic is training-free
+content similarity; and Two-Tower learns behavior-supervised content-aware
+matching. Generative Semantic-ID retrieval remains an optional experimental
+extension. A stronger learned retriever does not automatically make the other
+channels useless: the next comparison measures overlap, unique target hits and
+fixed-budget RRF gain.
+
+All current indices use `faiss.IndexFlatIP`: **exact** inner-product search, not
+ANN. At this catalogue scale, exact search keeps evaluation deterministic and
+avoids approximation confounds; HNSW / IVF / IVF-PQ are future scale-out index
+options.
 
 ### Cold Start
 
@@ -659,6 +728,8 @@ artifacts disagree. Nothing here is typed in by hand.
   The exploration quota mitigates exposure; it does not fix ranking.
 * Content retrieval is **exact** and therefore O(catalogue) per query; approximate
   indexing (IVF/HNSW) is deliberately not claimed.
+* The new Two-Tower standalone retrieval result has not been promoted to a
+  headline metric: the shared-loop cross-channel rerun is still pending.
 * Serving is single-process and CPU-only, with no authentication, rate limiting or
   caching. Latency figures are demo benchmarks for relative comparison, not SLAs.
 * The subset ships no item titles or captions beyond the official title file, so

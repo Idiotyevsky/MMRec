@@ -1,0 +1,2 @@
+channel,protocol,dataset,num_users,Recall@100,Recall@200,Recall@500,Recall@1000,checkpoint,artifact
+two_tower,standalone_full_catalog_retrieval,base,100000,0.2550,0.3405,0.4779,0.5987,results/runs/two_tower_base/best.pt,results/runs/two_tower_base/metrics.json
