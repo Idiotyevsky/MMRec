@@ -81,7 +81,7 @@ the **same checkpoint and the same users** ranked over the whole catalogue.
 
 | Stage | Implementation |
 |---|---|
-| Recall | Popular (training frequency) · ItemCF (cosine co-occurrence) · Semantic (text + image, exact inner-product search) |
+| Recall | Popular (training frequency) · ItemCF (cosine co-occurrence) · Semantic (training-free text + image) · optional Two-Tower (behaviour-supervised, content-only item tower; exact inner-product search) |
 | Merge | Reciprocal Rank Fusion over ranks, with every contributing channel kept on the candidate |
 | Rank | MM-SASRec — the user behaviour sequence scored against ID + text + image item representations |
 | Rerank | seen filter · dedup · optional zero-train exploration quota |
@@ -670,7 +670,7 @@ artifacts disagree. Nothing here is typed in by hand.
 <summary><b>Repository structure</b></summary>
 
 ```
-src/recall/       popular / itemcf / semantic channels + candidate merge
+src/recall/       popular / itemcf / semantic / optional two_tower channels + candidate merge
 src/rerank/       seen filter, dedup, zero-train exploration quota
 src/pipeline/     ranker registry + two-stage recommender
 src/models/       bpr, sasrec, mm_sasrec, item_encoder, fusion, rqvae, generative_rec

@@ -41,6 +41,8 @@ def _cfg(name: str, processed_dir, feature_dir, **model_kw) -> Config:
     ("mm_sasrec", {"fusion": "gated", "modalities": {"id": True, "text": True, "image": True}}),
     ("mm_sasrec", {"fusion": "gated", "modalities": {"id": True, "text": True},
                    "id_dropout_prob": 0.3}),
+    ("two_tower", {"max_history": 20, "modalities": {"text": True, "image": True},
+                    "normalize_embeddings": True}),
     ("bpr", {}),
     ("popular", {}),
     ("random", {}),

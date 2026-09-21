@@ -3,6 +3,7 @@ from .itemcf import ItemCFRecall, build_itemcf_index, load_itemcf_index, save_it
 from .pipeline import CandidateMerger, MergeResult
 from .popular import PopularRecall
 from .semantic import SemanticRecall, build_content_embeddings
+from .two_tower import TwoTowerRecall, load_two_tower_recall
 
 __all__ = [
     "RecallStrategy",
@@ -17,4 +18,6 @@ __all__ = [
     "save_itemcf_index",
     "load_itemcf_index",
     "build_content_embeddings",
+    "TwoTowerRecall",
+    "load_two_tower_recall",
 ]

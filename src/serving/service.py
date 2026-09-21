@@ -27,6 +27,7 @@ from ..recall import (
     ItemCFRecall,
     PopularRecall,
     SemanticRecall,
+    load_two_tower_recall,
     load_itemcf_index,
 )
 from ..recall.semantic import build_content_embeddings
@@ -53,6 +54,7 @@ class ShortRecService:
         generative_checkpoint: str | None = None,
         generative_beam: int = 20,
         semantic_ids: str = "artifacts/semantic_ids.npz",
+        two_tower_checkpoint: str | None = None,
     ) -> None:
         # `root` and `ranker_specs` exist so tests can point the whole service at
         # a synthetic dataset instead of the real MicroLens artifacts.
@@ -88,6 +90,14 @@ class ShortRecService:
             generative_checkpoint, generative_beam, semantic_ids)
         if self.generative is not None:
             strategies.append(self.generative)
+        # Explicit opt-in: a missing or incompatible learned-retrieval artifact
+        # must not change (or take down) the existing serving default.
+        if two_tower_checkpoint:
+            try:
+                strategies.append(load_two_tower_recall(self.root / two_tower_checkpoint, self.data, device=self.device))
+                LOG.info("Two-Tower recall channel enabled")
+            except Exception as exc:  # noqa: BLE001 - serving remains available
+                LOG.warning(f"Two-Tower channel disabled ({exc})")
         self.merger = CandidateMerger(strategies)
         self.channel_status = {name: (True, "loaded") for name in self.merger.source_names}
 

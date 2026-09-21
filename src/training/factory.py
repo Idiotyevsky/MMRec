@@ -13,8 +13,9 @@ from ..models.mm_sasrec import MMSASRec
 from ..models.popular import PopularRecommender
 from ..models.random_model import RandomRecommender
 from ..models.sasrec import SASRec
+from ..models.two_tower import TwoTowerRetriever
 
-MODEL_NAMES = ("popular", "bpr", "sasrec", "mm_sasrec", "random")
+MODEL_NAMES = ("popular", "bpr", "sasrec", "mm_sasrec", "two_tower", "random")
 
 
 def _row_for_item(processed_dir: Path, modalities: list[str]) -> dict[str, np.ndarray]:
@@ -68,6 +69,12 @@ def build_model(cfg, data: ProcessedData, device: torch.device | str = "cpu") ->
             normalize_scores=bool(m.get("normalize_scores", False)),
             **common,
         )
+    elif name == "two_tower":
+        modalities = {k: bool(v) for k, v in dict(m.get("modalities", {"text": True, "image": True})).items()}
+        if modalities.get("id", False):
+            raise ValueError("two_tower forbids an ID embedding: item cold-start requires content-only items")
+        enabled_content = [k for k, v in modalities.items() if v and k in ("text", "image")]
+        model = TwoTowerRetriever(num_items=data.num_items, hidden_size=int(m.get("hidden_size", 128)), max_history=int(m.get("max_history", m.get("max_seq_len", 50))), dropout=float(m.get("dropout", 0.1)), recency_decay=float(m.get("recency_decay", 0.9)), feature_dir=str(cfg.data.get("feature_dir", "data/raw")), row_for_item=_row_for_item(Path(cfg.data.processed_dir), enabled_content), modalities=modalities, normalize_embeddings=bool(m.get("normalize_embeddings", True)))
     elif name == "bpr":
         model = BPRMF(
             num_users=data.num_users,

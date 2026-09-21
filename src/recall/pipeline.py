@@ -2,7 +2,8 @@
 
     popular  ─┐
     itemcf   ─┼─►  merge / dedup / source trace  ─►  ranked candidate pool
-    semantic ─┘
+    semantic ─┼─► merge / dedup / source trace
+    two_tower┘
 
 The merge step must not throw information away: the Recommendation Inspector
 shows *which* channel produced each candidate and at what rank, so every

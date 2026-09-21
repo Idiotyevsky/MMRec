@@ -121,6 +121,13 @@ def build_merger(args, data: ProcessedData, users: np.ndarray | None = None) -> 
         strategies.append(SemanticRecall(np.load(emb_path), data.num_items))
     else:
         LOG.warning(f"content embeddings missing at {emb_path}; skipping that channel")
+    if args.two_tower_run:
+        run = ROOT / args.two_tower_run
+        try:
+            from src.recall.two_tower import load_two_tower_recall
+            strategies.append(load_two_tower_recall(run, data, device=args.two_tower_device))
+        except Exception as exc:  # artifact incompatibility is a hard signal, not silent use
+            LOG.warning(f"Two-Tower run unavailable at {run}; skipping channel ({exc})")
     detail = None
     if args.generative_checkpoint:
         ck = ROOT / args.generative_checkpoint
@@ -140,6 +147,9 @@ def main() -> None:
     ap.add_argument("--processed-dir", default="data/processed/base")
     ap.add_argument("--itemcf-index", default="artifacts/itemcf_neighbors.npz")
     ap.add_argument("--content-embeddings", default="artifacts/content_embeddings.npy")
+    ap.add_argument("--two-tower-run", default=None,
+                    help="finished Two-Tower run directory containing best.pt and exported embeddings")
+    ap.add_argument("--two-tower-device", default="cpu")
     ap.add_argument("--ks", nargs="*", type=int, default=[100, 200, 500, 1000])
     ap.add_argument("--max-users", type=int, default=None)
     ap.add_argument("--per-source-k", type=int, default=1000)

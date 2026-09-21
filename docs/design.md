@@ -180,7 +180,14 @@ two-stage split is the standard answer, and the interesting engineering question
 is where the recall/ranking boundary should sit — which is exactly what
 `scripts/evaluate_pipeline.py` measures.
 
-**Recall channels** (`src/recall/`). All three implement `RecallStrategy.recall`
+**Recall channels** (`src/recall/`). Popular, ItemCF, Semantic and the optional
+Two-Tower channel implement `RecallStrategy.recall`.  Two-Tower is a retrieval
+model, not a ranker: its content-only item tower (no trainable item-ID branch)
+is precomputed and its small recency-pooling user tower queries an exact
+`IndexFlatIP` index.  This preserves the ability to index an item with text or
+image features but zero training interactions.  At the current ~19.7K catalogue
+size exact search is intentional; HNSW/IVF-PQ are future index backends, not
+claims about the current implementation.
 and share one contract: PAD is never returned, the user's history is always
 excluded, results are ordered and carry a 1-based rank. The base class provides
 the filtering so a new channel cannot accidentally violate it.

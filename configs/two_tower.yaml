@@ -1,0 +1,27 @@
+model:
+  name: two_tower
+  hidden_size: 128
+  max_history: 50
+  recency_decay: 0.9
+  modalities: {text: true, image: true}
+  dropout: 0.1
+  normalize_embeddings: true
+data:
+  processed_dir: data/processed/base
+  feature_dir: data/raw
+  max_sequence_length: 50
+loss: {type: sampled_softmax, num_negatives: 128, temperature: 0.07, in_batch_negatives: false}
+negative_sampling: {mode: uniform}
+training:
+  batch_size: 512
+  learning_rate: 0.001
+  weight_decay: 0.0001
+  max_grad_norm: 5.0
+  amp: true
+  epochs: 200
+  early_stopping_patience: 10
+  monitor: Recall@100
+  monitor_mode: max
+  seed: 42
+  num_workers: 0
+evaluation: {full_ranking: true, item_chunk_size: 4096, ks: [20, 50, 100, 200, 500, 1000]}
