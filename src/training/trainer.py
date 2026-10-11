@@ -24,6 +24,7 @@ from torch.utils.data import DataLoader
 
 from ..data.dataset import EvalDataset, ProcessedData, TrainDataset, collate_eval, collate_train
 from ..data.negative_sampler import NegativeSampler, build_training_interaction_keys
+from ..data.in_batch_sampler import InBatchNegativeSampler
 from ..evaluation.evaluator import FullRankingEvaluator
 from ..models.bpr import bpr_loss
 from ..models.loss import sampled_softmax_loss
@@ -69,19 +70,27 @@ class Trainer:
         self.num_negatives = int(l.get("num_negatives", 128))
         self.temperature = float(l.get("temperature", 1.0))
         self.in_batch_negatives = bool(l.get("in_batch_negatives", False))
+        if self.num_negatives < 0:
+            raise ValueError("num_negatives must be nonnegative")
+        if self.in_batch_negatives and self.loss_type != "sampled_softmax":
+            raise ValueError("in-batch negatives require sampled_softmax")
+        if self.loss_type == "sampled_softmax" and not self.in_batch_negatives and self.num_negatives == 0:
+            raise ValueError("sampled_softmax requires sampled or in-batch negatives")
 
         ns = cfg.get("negative_sampling", {}) or {}
         # train-prefix interactions only: val/test targets must stay reachable.
+        train_keys = build_training_interaction_keys(
+            data.flat_items, data.user_offsets, data.train_len, data.num_items
+        )
         self.sampler = NegativeSampler(
             num_items=data.num_items,
             train_freq=data.train_freq,
-            all_interactions=build_training_interaction_keys(
-                data.flat_items, data.user_offsets, data.train_len, data.num_items
-            ),
+            all_interactions=train_keys,
             mode=str(ns.get("mode", "uniform")),
             popularity_power=float(ns.get("popularity_power", 0.75)),
             seed=self.seed + 1,
         )
+        self.in_batch_sampler = InBatchNegativeSampler(data.num_items, train_keys) if self.in_batch_negatives else None
 
         self.evaluator = FullRankingEvaluator(
             num_items=data.num_items,
@@ -213,11 +222,14 @@ class Trainer:
                     seq_repr = self.model.encode_sequence(input_ids)
                     pos_emb, _ = self.model.item_embeddings(target)
                     neg_emb, _ = self.model.item_embeddings(neg_ids_t)
-                    ib_emb = None
-                    if self.in_batch_negatives and input_ids.shape[0] > 1:
-                        # other users' positives: roll by one so no row sees its
-                        # own targets (queries and keys differ per row)
-                        ib_emb = pos_emb.roll(shifts=1, dims=0).detach()
+                    ib_emb = ib_mask = None
+                    if self.in_batch_sampler is not None:
+                        ib = self.in_batch_sampler.sample(
+                            torch.as_tensor(user_ids, dtype=torch.long, device=self.device), target
+                        )
+                        if ib.item_ids.numel():
+                            ib_emb, _ = self.model.item_embeddings(ib.item_ids)
+                            ib_mask = ib.valid_mask
                     loss = sampled_softmax_loss(
                         seq_repr,
                         pos_emb,
@@ -225,6 +237,7 @@ class Trainer:
                         target,
                         temperature=self.temperature,
                         in_batch_neg_emb=ib_emb,
+                        in_batch_neg_mask=ib_mask,
                     )
                     with torch.no_grad():
                         valid = (target != 0).to(seq_repr.dtype)
@@ -307,7 +320,7 @@ class Trainer:
         self.log.info(f"training on {self.device} | params={self.model.num_parameters():,}")
         self.log.info(
             f"train users={len(loader.dataset)} batch={self.batch_size} "
-            f"neg={self.num_negatives} amp={self.amp} monitor={self.monitor}"
+            f"neg={self.num_negatives} in_batch={self.in_batch_negatives} amp={self.amp} monitor={self.monitor}"
         )
 
         epochs_without_improvement = 0

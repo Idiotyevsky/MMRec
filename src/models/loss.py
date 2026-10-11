@@ -14,6 +14,7 @@ def sampled_softmax_logits(
     neg_emb: torch.Tensor,
     temperature: float = 1.0,
     in_batch_neg_emb: torch.Tensor | None = None,
+    in_batch_neg_mask: torch.Tensor | None = None,
 ) -> torch.Tensor:
     """Per-position logits ``(B, L, 1 + N [+ K])``; column 0 is the positive.
 
@@ -36,9 +37,22 @@ def sampled_softmax_logits(
     s_neg = torch.einsum("blh,bnh->bln", sequence_repr, neg_emb) / tau  # (B, L, N)
     logits = torch.cat([s_pos.unsqueeze(-1), s_neg], dim=-1)  # (B, L, 1 + N)
 
-    if in_batch_neg_emb is not None and in_batch_neg_emb.shape[1] > 0:
-        s_ib = torch.einsum("blh,bkh->blk", sequence_repr, in_batch_neg_emb) / tau
+    if in_batch_neg_emb is not None:
+        if in_batch_neg_emb.ndim == 2:
+            if in_batch_neg_mask is None:
+                raise ValueError("shared in-batch embeddings require a validity mask")
+            s_ib = torch.einsum("blh,kh->blk", sequence_repr, in_batch_neg_emb) / tau
+        elif in_batch_neg_emb.ndim == 3:
+            s_ib = torch.einsum("blh,bkh->blk", sequence_repr, in_batch_neg_emb) / tau
+        else:
+            raise ValueError("in-batch embeddings must be (K,H) or (B,K,H)")
+        if in_batch_neg_mask is not None:
+            if in_batch_neg_mask.dtype != torch.bool or in_batch_neg_mask.shape != (s_ib.shape[0], s_ib.shape[2]):
+                raise ValueError("in-batch validity mask must be bool (B,K)")
+            s_ib = s_ib.masked_fill(~in_batch_neg_mask.to(s_ib.device)[:, None, :], -torch.inf)
         logits = torch.cat([logits, s_ib], dim=-1)
+    elif in_batch_neg_mask is not None:
+        raise ValueError("in-batch validity mask requires embeddings")
     return logits
 
 
@@ -49,6 +63,7 @@ def sampled_softmax_loss(
     target: torch.Tensor,
     temperature: float = 1.0,
     in_batch_neg_emb: torch.Tensor | None = None,
+    in_batch_neg_mask: torch.Tensor | None = None,
 ) -> torch.Tensor:
     """Position-wise sampled-softmax (sampled cross-entropy) next-item loss.
 
@@ -65,16 +80,17 @@ def sampled_softmax_loss(
     neg_emb       : (B, N, H) negatives shared by the whole sequence of a user.
     target        : (B, L) ground-truth item ids; ``target == PAD`` marks a
         position with no supervision and is excluded from the average.
-    in_batch_neg_emb : optional (B, K, H) extra negatives.  The caller must
-        guarantee they are not the user's own positives; misuse silently makes
-        the task easier.
+    in_batch_neg_emb : optional shared (K, H) pool or legacy (B, K, H) negatives.
+        Gradients flow through negative item embeddings; do not detach them.
+    in_batch_neg_mask : bool (B, K), True for legal negatives. Required for a
+        shared pool; exclusions are computed from training data only.
 
     A single ``(B, H)`` representation is rejected on purpose -- broadcasting the
     last hidden state over all positions would score ``h_L`` against
     ``target_1 ... target_L``, which is not the SASRec objective.
     """
     logits = sampled_softmax_logits(
-        sequence_repr, pos_emb, neg_emb, temperature, in_batch_neg_emb
+        sequence_repr, pos_emb, neg_emb, temperature, in_batch_neg_emb, in_batch_neg_mask
     )
     B, L = logits.shape[:2]
     zeros = torch.zeros((B, L), dtype=torch.long, device=logits.device)

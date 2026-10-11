@@ -266,6 +266,27 @@ training loss:
 L_t=-\log\frac{\exp(u_t^\top v^+/\tau)}{\exp(u_t^\top v^+/\tau)+\sum_j\exp(u_t^\top v_j^-/\tau)}.
 \]
 
+Optional **in-batch negatives** reuse the batch's last non-PAD training positive
+from each user. The shared pool is deduplicated by item ID; each row masks its
+own positives and all train-prefix interactions, including history outside the
+sequence window. Validation/test labels are never used for exclusions. Negative
+item embeddings receive gradients. The pool contains at most one item per batch
+row, avoiding an all-position quadratic pool.
+
+```bash
+# Hybrid: 128 uniform negatives plus eligible in-batch positives
+python scripts/train.py --config configs/two_tower.yaml loss.in_batch_negatives=true
+# In-batch only
+python scripts/train.py --config configs/two_tower.yaml loss.in_batch_negatives=true loss.num_negatives=0
+```
+
+The option also works for SASRec / MM-SASRec sampled-softmax training; it is off
+by default and unsupported for BPR. Batch positives follow the training data
+distribution, not a uniform catalogue distribution; no log-Q correction is
+applied. Singleton/all-masked batches add no in-batch negatives (and give zero
+loss in in-batch-only mode). Existing reported metrics use the original config;
+no quality improvement is claimed without a separately trained/evaluated run.
+
 | | Semantic Recall | Two-Tower |
 |---|---|---|
 | Supervision | none | user interaction |

@@ -98,11 +98,34 @@ rejects anything that is:
 
 * PAD (item 0),
 * the positive target of the current batch row,
-* any interaction of that user in the whole dataset (train + val + test).
+* any interaction of that user in the **training prefix only**.
 
 Membership is an `O(log n)` `searchsorted` over a sorted
 `user * num_items + item` key array, so exclusion is exact rather than
 probabilistic. `tests/test_negative_sampling.py` asserts each guarantee.
+
+Optional `loss.in_batch_negatives=true` adds a shared item pool via
+`InBatchNegativeSampler`: the last non-PAD **training** target per row, deduplicated
+by item ID, with at most B items. Every query row excludes its own targets and
+all known train-prefix interactions (including truncated history); PAD and
+padding-only rows cannot contribute. A vectorized device-side `searchsorted`
+uses the same training keys as the catalogue sampler. No validation/test label
+is read when selecting or masking negatives.
+
+The loss computes `(B,L,K)` query-to-pool scores, masks forbidden entries to
+`-inf`, and appends them to the ordinary sampled-softmax denominator. Negative
+item encodings are not detached, so both towers receive gradients. Ordinary
+sampled negatives remain active; setting `loss.num_negatives=0` selects
+in-batch-only training. Singleton/all-masked pools add no negatives; without
+catalogue negatives their loss is zero. This is supported for Two-Tower,
+SASRec and MM-SASRec sampled-softmax, not BPR. The default remains disabled.
+
+Using one representative per row avoids a `(B*L)^2` all-position score matrix:
+additional logits are O(B*L*B), and membership masking uses O(B*B) keys.
+The pool is local to the current batch/device, with no cross-device all-gather.
+Batch positives are not uniform catalogue samples; the implementation applies
+no log-Q correction. Existing reported experiments are unchanged; a quality
+comparison requires a separate training run.
 
 ## 7. Evaluation
 

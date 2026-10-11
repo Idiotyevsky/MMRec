@@ -75,6 +75,16 @@ appears in at least one user's top-20).
 
 ## 4. Validation vs test
 
+Training negative exclusions use **only train-prefix interactions**. Optional
+in-batch negatives (`loss.in_batch_negatives=true`) select the last non-PAD
+training target from each batch row, deduplicate by item ID, and mask each
+user's own positives and all known train-prefix items. Validation/test targets
+remain legal negatives if supplied by another user's training sample. No future
+labels are consulted. In-batch negatives can augment catalogue negatives or
+replace them (`loss.num_negatives=0`); the default is off. This changes the
+training objective, not full-catalogue evaluation, and no existing metric is
+relabelled as an in-batch result.
+
 Validation is used for early stopping and checkpoint selection, so validation
 numbers are **optimistically biased**. Test numbers are reported from the best
 checkpoint and are the only ones used for conclusions. Both are written to

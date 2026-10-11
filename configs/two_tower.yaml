@@ -10,7 +10,11 @@ data:
   processed_dir: data/processed/base
   feature_dir: data/raw
   max_sequence_length: 50
-loss: {type: sampled_softmax, num_negatives: 128, temperature: 0.07, in_batch_negatives: false}
+loss:
+  type: sampled_softmax
+  num_negatives: 128  # use 0 for in-batch-only training
+  temperature: 0.07
+  in_batch_negatives: false  # opt-in: unique last training positives + train-seen masking
 negative_sampling: {mode: uniform}
 training:
   batch_size: 512
