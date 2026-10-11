@@ -288,7 +288,7 @@ online
   request -> popular | itemcf | semantic recall
           -> merge / dedup / RRF (source trace kept)
           -> MM-SASRec ranking over the pool
-          -> rerank (seen filter, dedup, zero-train exploration quota)
+          -> rerank (seen filter, dedup, optional MMR, zero-train exploration quota)
           -> top-K feed
 
 evaluation

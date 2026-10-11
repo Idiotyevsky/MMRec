@@ -26,6 +26,11 @@ class RecommendationItem(BaseModel):
     item_id: int = Field(..., description="raw MicroLens item id")
     ranking_score: float
     final_rank: int
+    ranking_position: int | None = None
+    rerank_delta: int | None = None
+    mmr_score: float | None = None
+    mmr_relevance: float | None = None
+    mmr_redundancy: float | None = None
     sources: list[str]
     recall_rank: dict[str, int] = Field(default_factory=dict)
     #: simulated-cold **benchmark** membership (cold10 dataset only)

@@ -24,6 +24,11 @@ export interface RecommendationItem {
   item_id: number;
   ranking_score: number;
   final_rank: number;
+  ranking_position?: number | null;
+  rerank_delta?: number | null;
+  mmr_score?: number | null;
+  mmr_relevance?: number | null;
+  mmr_redundancy?: number | null;
   merge_score?: number;
   sources: string[];
   source_trace?: SourceTrace[];

@@ -204,6 +204,9 @@ def create_app(service: ShortRecService | None = None, **service_kwargs):
                                               description="alias of `exploration`"),
         cold_quota: int | None = Query(None, ge=0, le=20, deprecated=True),
         max_candidates: int | None = Query(None, ge=1, le=20000),
+        mmr: bool = Query(False, description="diversify ranked candidates with content MMR"),
+        mmr_lambda: float = Query(.8, ge=0, le=1, description="relevance weight; 1 preserves ranking"),
+        mmr_candidate_k: int = Query(100, ge=1, le=1000, description="ranking window for MMR"),
     ) -> dict:
         service_ = svc()
         if cold_exploration is not None:
@@ -215,7 +218,8 @@ def create_app(service: ShortRecService | None = None, **service_kwargs):
                                 detail=f"unknown ranker {ranker!r}; available {service_.registry.names}")
         try:
             return _timed(service_.recommend, user_id, recall_k, top_k, ranker,
-                          exploration, exploration_quota, max_candidates)
+                          exploration, exploration_quota, max_candidates,
+                          mmr=mmr, mmr_lambda=mmr_lambda, mmr_candidate_k=mmr_candidate_k)
         except IndexError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
 
@@ -228,6 +232,9 @@ def create_app(service: ShortRecService | None = None, **service_kwargs):
         top_n: int = Query(30, ge=1, le=200),
         exploration: bool = Query(False),
         cold_exploration: bool | None = Query(None, deprecated=True),
+        mmr: bool = Query(False),
+        mmr_lambda: float = Query(.8, ge=0, le=1),
+        mmr_candidate_k: int = Query(100, ge=1, le=1000),
     ) -> dict:
         if cold_exploration is not None:
             exploration = cold_exploration
@@ -237,7 +244,8 @@ def create_app(service: ShortRecService | None = None, **service_kwargs):
                 raise HTTPException(status_code=400, detail=f"unknown ranker {name!r}")
         try:
             return _timed(service_.inspect, user_id, recall_k, top_n, ranker,
-                          compare, exploration)
+                          compare, exploration,
+                          mmr=mmr, mmr_lambda=mmr_lambda, mmr_candidate_k=mmr_candidate_k)
         except IndexError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
 

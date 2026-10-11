@@ -17,6 +17,8 @@ export default function LiveDemo() {
   const [compare, setCompare] = useState(true);
   const [topK, setTopK] = useState(10);
   const [exploration, setExploration] = useState(false);
+  const [mmr, setMmr] = useState(false);
+  const [mmrLambda, setMmrLambda] = useState(.8);
 
   const [user, setUser] = useState<UserResponse | null>(null);
   const [trace, setTrace] = useState<InspectResponse | null>(null);
@@ -50,6 +52,9 @@ export default function LiveDemo() {
         compare: compare ? "sasrec" : "",
         recall_k: 200,
         top_n: topK,
+        exploration,
+        mmr,
+        mmr_lambda: mmrLambda,
       });
     } catch (e) {
       setError(e);
@@ -70,7 +75,7 @@ export default function LiveDemo() {
       setStage(i);
       if (i >= STAGES && timer.current) window.clearInterval(timer.current);
     }, perStage);
-  }, [userId, ranker, compare, topK]);
+  }, [userId, ranker, compare, topK, exploration, mmr, mmrLambda]);
 
   useEffect(() => () => {
     if (timer.current) window.clearInterval(timer.current);
@@ -104,7 +109,7 @@ export default function LiveDemo() {
     const byId = new Map(trace.top_candidates.map((c) => [c.item_id, c]));
     return trace.final_top_k.slice(0, topK).map((r) => {
       const detailed = byId.get(r.item_id);
-      return { ...r, ...(detailed ?? {}) } as typeof r;
+      return { ...(detailed ?? {}), ...r } as typeof r;
     });
   }, [trace, topK]);
 
@@ -166,6 +171,16 @@ export default function LiveDemo() {
               <button className={!exploration ? "on" : ""} onClick={() => setExploration(false)}>off</button>
             </div>
           </label>
+          <label className="field">
+            MMR diversity
+            <input type="checkbox" checked={mmr} onChange={(e) => setMmr(e.target.checked)} />
+          </label>
+          {mmr && <label className="field">
+            Relevance weight λ
+            <select value={mmrLambda} onChange={(e) => setMmrLambda(Number(e.target.value))}>
+              {[.7, .8, .9, .95, 1].map((v) => <option key={v} value={v}>{v}</option>)}
+            </select>
+          </label>}
           <span className="spacer" />
           <button className="run" onClick={run} disabled={running}>
             {running ? "Running…" : "Run Recommendation"}

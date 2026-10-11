@@ -1,13 +1,13 @@
 """Lightweight serving-side reranking.
 
-Deliberately *not* a learned reranker.  It implements the three policies every
-feed needs and nothing more:
+Serving policies plus optional content-based MMR:
 
 1. **seen filter** — never show an item the user already watched;
 2. **dedup** — never show the same item twice;
 3. **exploration quota** — reserve a few slots for items with **no training
    signal** (``exploration_candidate``), which a score-only ordering would
    never surface.
+4. **MMR** — trade ranking relevance against content redundancy.
 
 The quota is an *exposure policy*, not a model improvement.  Offline ranking
 metrics are measured with it **off**; it exists because the cold-item experiment
@@ -23,6 +23,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+import numpy as np
+
+from .mmr import mmr_order
+
 
 @dataclass
 class RerankConfig:
@@ -32,6 +36,13 @@ class RerankConfig:
     exploration: bool = False
     #: minimum number of exploration candidates guaranteed in the output
     exploration_quota: int = 2
+    mmr: bool = False
+    mmr_lambda: float = .8
+    mmr_candidate_k: int = 100
+
+    def __post_init__(self):
+        if not np.isfinite(self.mmr_lambda) or not 0 <= self.mmr_lambda <= 1 or self.mmr_candidate_k < 1:
+            raise ValueError("invalid MMR lambda or candidate window")
 
     def as_dict(self) -> dict:
         return {
@@ -39,6 +50,9 @@ class RerankConfig:
             "dedup": self.dedup,
             "exploration": self.exploration,
             "exploration_quota": self.exploration_quota,
+            "mmr": self.mmr,
+            "mmr_lambda": self.mmr_lambda,
+            "mmr_candidate_k": self.mmr_candidate_k,
         }
 
 
@@ -56,6 +70,7 @@ def rerank(
     config: RerankConfig,
     final_k: int,
     history: set[int] | None = None,
+    content_embeddings: np.ndarray | None = None,
 ) -> RerankResult:
     """Apply the serving policies to an already-scored candidate list.
 
@@ -75,6 +90,8 @@ def rerank(
     seen_ids: set[int] = set()
     for entry in scored_items:
         item = int(entry["item_id"])
+        if item <= 0:
+            continue
         if config.filter_seen and item in history:
             applied["seen_filtered"] += 1
             continue
@@ -82,13 +99,24 @@ def rerank(
             applied["deduped"] += 1
             continue
         seen_ids.add(item)
-        kept.append(entry)
+        kept.append(dict(entry))
+
+    for pos, entry in enumerate(kept, start=1):
+        entry["ranking_position"] = pos
+
+    if final_k <= 0:
+        applied["exploration_injected_ids"] = []
+        return RerankResult([], applied)
 
     exploration_pool = [e for e in kept if e.get("exploration_candidate")]
     applied["exploration_available"] = len(exploration_pool)
     injected_ids: set[int] = set()
 
     if not config.exploration or config.exploration_quota <= 0:
+        if config.mmr:
+            kept, applied["mmr"] = mmr_order(kept, content_embeddings, final_k,
+                                              config.mmr_lambda, config.mmr_candidate_k)
+            applied["mmr"]["mode"] = "window_selection"
         out = kept[:final_k]
     else:
         quota = min(int(config.exploration_quota), final_k)
@@ -109,9 +137,16 @@ def rerank(
                     out.append(e)
                     chosen.add(int(e["item_id"]))
         out.sort(key=lambda e: -float(e["ranking_score"]))
+        if config.mmr:
+            # Preserve the quota-selected set as a hard exposure constraint;
+            # MMR changes only its order when exploration is enabled.
+            out, applied["mmr"] = mmr_order(out, content_embeddings, len(out),
+                                            config.mmr_lambda, config.mmr_candidate_k)
+            applied["mmr"]["mode"] = "quota_order_only"
 
     for pos, entry in enumerate(out, start=1):
         entry["final_rank"] = pos
+        entry["rerank_delta"] = entry["ranking_position"] - pos
         # exact: only items the quota actually injected are flagged
         entry["exploration"] = int(entry["item_id"]) in injected_ids
     applied["exploration_injected_ids"] = sorted(injected_ids)

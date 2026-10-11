@@ -45,6 +45,22 @@ def test_health(client):
     assert r.json()["status"] == "ok"
 
 
+def test_mmr_recommend_and_inspector(client):
+    r = client.get("/users/1/recommend", params={"mmr": True, "mmr_lambda": .5, "top_k": 5})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["rerank"]["mmr"]["applied"]
+    for item in body["recommendations"]:
+        assert item["mmr_score"] is not None
+        assert item["ranking_position"] >= 1
+        assert item["rerank_delta"] == item["ranking_position"] - item["final_rank"]
+        assert item["item_id"] not in body["history"]
+    inspected = client.get("/users/1/inspect", params={"mmr": True, "mmr_lambda": .5}).json()
+    assert inspected["rerank"]["mmr"]["applied"]
+    assert all(e["source_trace"] for e in inspected["final_top_k"])
+    assert client.get("/users/1/recommend", params={"mmr_lambda": 1.1}).status_code == 422
+
+
 def test_system_schema(client):
     r = client.get("/system")
     assert r.status_code == 200

@@ -44,6 +44,9 @@ export const api = {
       top_k?: number;
       exploration?: boolean;
       exploration_quota?: number;
+      mmr?: boolean;
+      mmr_lambda?: number;
+      mmr_candidate_k?: number;
     } = {},
   ) => get<RecommendResponse>(`/users/${id}/recommend`, opts),
   inspect: (
@@ -54,6 +57,9 @@ export const api = {
       recall_k?: number;
       top_n?: number;
       exploration?: boolean;
+      mmr?: boolean;
+      mmr_lambda?: number;
+      mmr_candidate_k?: number;
     } = {},
   ) => get<InspectResponse>(`/users/${id}/inspect`, opts),
   evaluation: () => get<EvaluationResponse>("/evaluation"),

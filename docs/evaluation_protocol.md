@@ -278,3 +278,21 @@ neither is wrong. They live in different tables (`overall.csv` vs
 channel(s) recalled each item. `multiple` means more than one channel found it.
 This is the evidence for whether semantic recall finds items the collaborative
 channels miss, split by popularity bucket.
+
+### MMR serving rerank evaluation
+
+`scripts/evaluate_mmr.py` compares score ordering with optional content MMR
+using the same users, histories, targets, four-channel RRF pool, ranker
+checkpoint and final K. Ranked candidates are cached with dataset, mapping,
+checkpoint and recall-index fingerprints; `--reuse-cache` rejects mismatches
+and can resume a partial cache. The candidate budget is 1,000, MMR window 100,
+final K 20, and exploration quota is off in the default experiment.
+
+Lambda 0.8 is the predeclared opt-in default. The test lambda grid is descriptive
+and is not used to select a default on test data. Report Recall@20/NDCG@20
+alongside content ILD (`1 - mean pairwise cosine`), near-duplicate pair share
+(cosine >= 0.9), valid feature-pair coverage, catalogue coverage, head/tail/
+zero-train exposure and CPU rerank latency. These diversity measures are content
+proxies, not measured semantic categories or online satisfaction. Paired normal
+approximation intervals describe this user sample and checkpoint; they are
+not multi-seed results or corrected for comparisons across lambdas.

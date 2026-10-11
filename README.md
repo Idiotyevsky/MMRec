@@ -84,7 +84,7 @@ the **same checkpoint and the same users** ranked over the whole catalogue.
 | Recall | Popular · ItemCF · Semantic content retrieval · optional content-aware Two-Tower (behaviour-supervised, content-only item tower) |
 | Merge | Reciprocal Rank Fusion over ranks, with every contributing channel kept on the candidate |
 | Rank | MM-SASRec — the user behaviour sequence scored against ID + text + image item representations |
-| Rerank | seen filter · dedup · optional zero-train exploration quota |
+| Rerank | seen filter · dedup · optional content MMR · optional zero-train exploration quota |
 
 > **Two protocols, never mixed.** *Full-catalogue ranking* scores every item and
 > is the strict model comparison. *Two-stage ranking* scores only recalled
@@ -95,6 +95,21 @@ ShortRec uses **two-stage** in the retrieval → ranking sense: `Recall →
 MM-SASRec ranking → lightweight serving rerank`. MicroLens-100K has only about
 19.7K items, so this prototype does not insert a separate industrial pre-ranker;
 at larger scale the usual shape is `Recall → Pre-rank → Rank → Rerank`.
+
+### Content diversity with MMR
+
+Serving supports optional Maximal Marginal Relevance after MM-SASRec ranking.
+MMR balances normalized ranking relevance against the maximum text+image cosine
+similarity to an already selected item. The default opt-in settings are
+`mmr_lambda=0.8`, `mmr_candidate_k=100`; `lambda=1` preserves the score order.
+Enable it with `/users/7/recommend?mmr=true&mmr_lambda=0.8`, or the MMR control
+in Live Demo / Recommendation Inspector. Responses preserve the original ranking
+score and expose the MMR score, redundancy penalty and rank movement.
+
+MMR trades relevance for content diversity, so it is off by default. When the
+exploration quota is enabled, MMR only reorders the quota-selected set. The
+[MMR findings](docs/mmr_findings.md) report paired Recall/NDCG, content ILD,
+catalogue coverage and CPU rerank latency from completed experiment artifacts.
 
 <a id="system-demo"></a>
 
@@ -755,7 +770,7 @@ artifacts disagree. Nothing here is typed in by hand.
 
 ```
 src/recall/       popular / itemcf / semantic / optional two_tower channels + candidate merge
-src/rerank/       seen filter, dedup, zero-train exploration quota
+src/rerank/       seen filter, dedup, optional MMR, zero-train exploration quota
 src/pipeline/     ranker registry + two-stage recommender
 src/models/       bpr, sasrec, mm_sasrec, item_encoder, fusion, rqvae, generative_rec
 src/data/         preprocessing, datasets, negative sampling, popularity, metadata

@@ -29,6 +29,8 @@ export default function Inspector() {
   const [userId, setUserId] = useState(7);
   const [ranker, setRanker] = useState("mm_concat");
   const [compare, setCompare] = useState("sasrec");
+  const [mmr, setMmr] = useState(false);
+  const [mmrLambda, setMmrLambda] = useState(.8);
   const [data, setData] = useState<InspectResponse | null>(null);
   const [selected, setSelected] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
@@ -44,14 +46,14 @@ export default function Inspector() {
     setLoading(true);
     setError(null);
     api
-      .inspect(userId, { ranker, compare, recall_k: 200, top_n: 60 })
+      .inspect(userId, { ranker, compare, recall_k: 200, top_n: 60, mmr, mmr_lambda: mmrLambda })
       .then((res) => {
         setData(res);
         setSelected(res.final_top_k[0]?.item_id ?? res.top_candidates[0]?.item_id ?? null);
       })
       .catch(setError)
       .finally(() => setLoading(false));
-  }, [userId, ranker, compare]);
+  }, [userId, ranker, compare, mmr, mmrLambda]);
 
   const rows = useMemo(() => {
     if (!data) return [];
@@ -76,7 +78,9 @@ export default function Inspector() {
 
   const picked = useMemo(() => {
     if (!data || selected === null) return null;
-    const entry = data.top_candidates.find((e) => e.item_id === selected);
+    const candidate = data.top_candidates.find((e) => e.item_id === selected);
+    const served = data.final_top_k.find((e) => e.item_id === selected);
+    const entry = candidate ? { ...candidate, ...(served ?? {}) } : served;
     if (!entry) return null;
     // Use the candidate's own source trace, not `recall_candidates` (which is
     // only a preview of the first N pool entries and would show "—" for any
@@ -123,6 +127,16 @@ export default function Inspector() {
               ))}
             </select>
           </label>
+          <label className="field">
+            MMR diversity
+            <input type="checkbox" checked={mmr} onChange={(e) => setMmr(e.target.checked)} />
+          </label>
+          {mmr && <label className="field">
+            Relevance weight λ
+            <select value={mmrLambda} onChange={(e) => setMmrLambda(Number(e.target.value))}>
+              {[.7, .8, .9, .95, 1].map((v) => <option key={v} value={v}>{v}</option>)}
+            </select>
+          </label>}
         </div>
       </Panel>
 
@@ -161,7 +175,7 @@ export default function Inspector() {
             {picked && (
               <>
                 <div className="trace">
-                  {(["popular", "itemcf", "semantic"] as const).map((name) => {
+                  {data.recall_channels.map((channel) => channel.name).map((name) => {
                     const r = picked.rankOf(name);
                     return (
                       <div key={name} style={{ display: "contents" }}>
@@ -185,11 +199,16 @@ export default function Inspector() {
                   <div className="trace-arrow">→</div>
                   <TraceNode
                     label={`${data.ranker.toUpperCase()}`}
-                    value={`#${rows.findIndex((r) => r.item_id === picked.entry.item_id) + 1}`}
+                    value={`#${picked.entry.ranking_position ?? rows.findIndex((r) => r.item_id === picked.entry.item_id) + 1}`}
                     note={`score ${fmt(picked.entry.ranking_score, 3)}`}
                     state="hit"
                   />
                   <div className="trace-arrow">→</div>
+                  {picked.entry.mmr_score !== null && picked.entry.mmr_score !== undefined && <>
+                    <TraceNode label="MMR" value={fmt(picked.entry.mmr_score, 4)}
+                      note={`redundancy ${fmt(picked.entry.mmr_redundancy ?? 0, 3)}`} />
+                    <div className="trace-arrow">→</div>
+                  </>}
                   <TraceNode
                     label="FINAL"
                     value={picked.finalRank ? `#${picked.finalRank}` : "—"}

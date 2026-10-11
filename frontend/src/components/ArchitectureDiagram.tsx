@@ -80,7 +80,7 @@ export function ArchitectureDiagram() {
       <Arrow x1={386} y1={374} x2={420} y2={374} />
       <Node x={422} y={352} w={152} h={44} label="MM-SASRec" sub="multimodal ranking" accent />
       <Arrow x1={574} y1={374} x2={608} y2={374} />
-      <Node x={610} y={352} w={130} h={44} label="Rerank" sub="exploration quota" />
+      <Node x={610} y={352} w={130} h={44} label="Rerank" sub="optional MMR + quota" />
       <Arrow x1={675} y1={396} x2={675} y2={428} />
       <Node x={610} y={430} w={130} h={30} label="Top-K feed" />
     </svg>

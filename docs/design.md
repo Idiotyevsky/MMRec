@@ -156,7 +156,7 @@ frequency + cold mask + offsets) and refuse to load into a different dataset.
 | `src/evaluation/slicing.py` | cold / popularity slices of one ranking pass |
 | `src/training/trainer.py` | training loop, AMP, checkpointing, early stopping |
 | `src/recall/*` | candidate generation channels + merge |
-| `src/rerank/simple.py` | seen filter, dedup, cold exploration quota |
+| `src/rerank/simple.py`, `mmr.py` | seen filter, dedup, optional MMR, exploration quota |
 | `src/pipeline/*` | ranker registry + two-stage recommender |
 | `src/data/metadata.py` | training-derived cold / bucket metadata for serving |
 | `src/retrieval/faiss_index.py` | exact inner-product index (Faiss, with numpy fallback) |
@@ -202,9 +202,29 @@ Deduplication merges rather than drops, because the Inspector needs to show
 factory and checkpoints; it does not reimplement scoring. Item embeddings are
 cached once at load, so a request scores only the candidate pool.
 
-**Rerank** (`src/rerank/simple.py`). Deliberately three policies only. The cold
-exploration quota is an exposure decision, not a ranking improvement, and is off
-for every offline metric.
+**Rerank** (`src/rerank/simple.py`, `mmr.py`). Seen filtering and deduplication
+precede optional MMR. Greedy selection maximizes
+`lambda * minmax(ranking_score) - (1-lambda) * max(content_cosine_to_selected)`.
+The first item is the highest-ranked item. Ties keep the input ranking order;
+`lambda=1` is exactly the original ranking. The relevance window defaults to
+100 (expanded to at least final K), lambda to 0.8 when explicitly enabled.
+Similarity uses the fixed 1152-D text+image content table, not ID embeddings.
+The implementation updates a maximum-similarity vector in O(window*K*D), so
+it does not build a catalogue-sized similarity matrix.
+
+Missing or invalid content tables cause an explicit score-order fallback in
+the response. Individual unavailable vectors have conservative redundancy 1
+after the first selection and do not gain a novelty bonus. ILD excludes pairs
+with unavailable features and reports valid-pair coverage. Original model
+scores and all source traces are retained; Inspector shows selection-time
+MMR relevance, redundancy, score, original rank and final rank.
+
+The exploration quota remains a hard exposure policy. With quota and MMR both
+enabled, the quota selects the item set first and MMR reorders only that set;
+it cannot remove a reserved item. The dedicated MMR experiment disables quota,
+caches identical four-channel RRF/MM-SASRec candidates, and reports relevance,
+content diversity, exposure and CPU latency separately from full-catalogue
+model metrics. See [MMR findings](mmr_findings.md).
 
 **Id spaces.** The model, recall channels and indices all work in internal ids
 (`1..num_items`). `src/serving/service.py` is the only place that converts to and

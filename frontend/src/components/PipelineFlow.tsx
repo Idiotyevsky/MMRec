@@ -161,6 +161,9 @@ export function PipelineFlow({
             ? "zero-train exploration on"
             : "zero-train exploration off"}
           {stats ? val(state, 6, ` · ${num(stats.exploration_in_pool)} zero-train candidates in the pool`) : ""}
+          {rec && (rec.rerank as { config?: { mmr?: boolean } }).config?.mmr
+            ? ((rec.rerank as { mmr?: { applied?: boolean } }).mmr?.applied
+              ? " · MMR on" : " · MMR requested, ranking fallback") : " · MMR off"}
         </div>
       </div>
 
@@ -216,6 +219,16 @@ export function RecommendationCard({
           <span className="k">Train interactions</span>
           <span className="v">{num(item.train_interactions)}</span>
         </div>
+        {item.mmr_score !== null && item.mmr_score !== undefined && <>
+          <div className="r">
+            <span className="k">MMR / redundancy</span>
+            <span className="v">{item.mmr_score.toFixed(3)} / {(item.mmr_redundancy ?? 0).toFixed(3)}</span>
+          </div>
+          <div className="r">
+            <span className="k">Rank → final</span>
+            <span className="v">{item.ranking_position} → {item.final_rank}</span>
+          </div>
+        </>}
       </div>
 
       <div>

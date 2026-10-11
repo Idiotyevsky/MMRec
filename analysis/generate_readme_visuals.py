@@ -168,7 +168,7 @@ def architecture_svg() -> str:
     p.append(_arrow(412, 417, 446, 417))
     p += _box(448, 394, 158, 46, "MM-SASRec", "multimodal ranking", accent=True)
     p.append(_arrow(606, 417, 640, 417))
-    p += _box(642, 394, 138, 46, "Rerank", "lightweight serving")
+    p += _box(642, 394, 138, 46, "Rerank", "optional MMR + quota")
     p.append(_arrow(711, 440, 711, 466))
     p += _box(642, 468, 138, 30, "Top-K feed")
 
@@ -261,25 +261,29 @@ def cold_start_summary_svg() -> str:
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--out-dir", default=str(ASSETS))
+    ap.add_argument("--check", action="store_true", help="check generated assets without writing")
     args = ap.parse_args()
 
     out = Path(args.out_dir)
-    (out / "icons").mkdir(parents=True, exist_ok=True)
-
-    for name in ICON_PATHS:
-        (out / "icons" / f"{name}.svg").write_text(icon_svg(name), encoding="utf-8")
-    print(f"wrote {len(ICON_PATHS)} icons to {out / 'icons'}")
-
-    (out / "system_architecture.svg").write_text(architecture_svg(), encoding="utf-8")
-    print(f"wrote {out / 'system_architecture.svg'}")
+    outputs = {Path("icons") / f"{name}.svg": icon_svg(name) for name in ICON_PATHS}
+    outputs[Path("system_architecture.svg")] = architecture_svg()
 
     data = _cold_numbers()
     if data:
-        (out / "cold_start_summary.svg").write_text(cold_start_summary_svg(), encoding="utf-8")
-        print(f"wrote {out / 'cold_start_summary.svg'} "
-              f"({len(data)} models from results/tables/cold_start.csv)")
+        outputs[Path("cold_start_summary.svg")] = cold_start_summary_svg()
     else:
         print("cold_start.csv not found; skipped cold-start summary")
+    if args.check:
+        stale = [str(p) for p,body in outputs.items()
+                 if not (out/p).exists() or (out/p).read_text(encoding="utf-8") != body]
+        if stale:
+            raise SystemExit("README visuals out of date: " + ", ".join(stale))
+        print(f"README visuals are up to date ({len(outputs)} checked)")
+    else:
+        for path,body in outputs.items():
+            (out/path).parent.mkdir(parents=True, exist_ok=True)
+            (out/path).write_text(body, encoding="utf-8")
+            print(f"wrote {out/path}")
 
 
 if __name__ == "__main__":

@@ -115,6 +115,7 @@ class ShortRecService:
         self.recommender = TwoStageRecommender(
             self.data, self.merger, self.registry,
             default_ranker=default_ranker, history_mode=history_mode,
+            content_embeddings=self.content_embeddings,
         )
 
         # ---- cold explorer (separate dataset) ----
@@ -259,11 +260,15 @@ class ShortRecService:
         cold_quota: int = 2,
         max_candidates: int | None = None,
         sources=None,
+        mmr: bool = False,
+        mmr_lambda: float = .8,
+        mmr_candidate_k: int = 100,
     ) -> dict:
         res = self.recommender.recommend(
             user_id, recall_k=recall_k, final_k=top_k, ranker=ranker,
             cold_exploration=cold_exploration, cold_quota=cold_quota,
             max_candidates=max_candidates, sources=sources,
+            mmr=mmr, mmr_lambda=mmr_lambda, mmr_candidate_k=mmr_candidate_k,
         )
         out = res.as_dict()
         out["exploration"] = res.rerank
@@ -282,11 +287,15 @@ class ShortRecService:
         compare: str | None = "sasrec",
         cold_exploration: bool = False,
         max_candidates: int | None = None,
+        mmr: bool = False,
+        mmr_lambda: float = .8,
+        mmr_candidate_k: int = 100,
     ) -> dict:
         out = self.recommender.inspect(
             user_id, recall_k=recall_k, top_n=top_n, ranker=ranker,
             compare=compare, cold_exploration=cold_exploration,
             max_candidates=max_candidates,
+            mmr=mmr, mmr_lambda=mmr_lambda, mmr_candidate_k=mmr_candidate_k,
         )
         out["history"] = self._raw_history(out["history"])
         out["target_item"] = self.to_raw(out["target_item"]) if out["target_item"] else None

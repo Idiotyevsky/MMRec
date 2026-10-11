@@ -73,6 +73,7 @@ class TwoStageRecommender:
         registry: RankerRegistry,
         default_ranker: str = "mm_concat",
         history_mode: str = "test",
+        content_embeddings: np.ndarray | None = None,
     ) -> None:
         if history_mode not in ("test", "full"):
             raise ValueError(f"history_mode must be 'test' or 'full', got {history_mode!r}")
@@ -82,6 +83,13 @@ class TwoStageRecommender:
         self.default_ranker = default_ranker
         self.history_mode = history_mode
         self.metadata = ItemMetadata(data)
+        if content_embeddings is None:
+            content_embeddings = next((s.embeddings for s in merger.strategies
+                                       if s.name == "semantic" and hasattr(s, "embeddings")), None)
+        if content_embeddings is not None:
+            if content_embeddings.ndim != 2 or content_embeddings.shape[0] != data.num_items + 1:
+                raise ValueError("rerank content embedding catalogue mismatch")
+        self.content_embeddings = content_embeddings
 
     # ------------------------------------------------------------------
     def history(self, user_id: int) -> list[int]:
@@ -142,6 +150,9 @@ class TwoStageRecommender:
         cold_quota: int = 2,
         max_candidates: int | None = None,
         sources: Sequence[str] | None = None,
+        mmr: bool = False,
+        mmr_lambda: float = .8,
+        mmr_candidate_k: int = 100,
     ) -> RecommendResult:
         import time
 
@@ -164,8 +175,10 @@ class TwoStageRecommender:
         t_rank = time.perf_counter()
 
         entries = self._entries(hist, candidate_ids, scores, merged, ranker_name)
-        cfg = RerankConfig(exploration=cold_exploration, exploration_quota=cold_quota)
-        rr = rerank(entries, cfg, final_k=final_k, history=set(hist))
+        cfg = RerankConfig(exploration=cold_exploration, exploration_quota=cold_quota,
+                           mmr=mmr, mmr_lambda=mmr_lambda, mmr_candidate_k=mmr_candidate_k)
+        rr = rerank(entries, cfg, final_k=final_k, history=set(hist),
+                    content_embeddings=self.content_embeddings)
         t_end = time.perf_counter()
 
         target = self.target(user_id)
@@ -217,6 +230,8 @@ class TwoStageRecommender:
                 "train_interactions": meta.train_interactions,
             })
         entries.sort(key=lambda e: -e["ranking_score"])
+        for pos, entry in enumerate(entries, start=1):
+            entry["ranking_position"] = pos
         return entries
 
     # ------------------------------------------------------------------
@@ -229,6 +244,9 @@ class TwoStageRecommender:
         compare: str | None = "sasrec",
         cold_exploration: bool = False,
         max_candidates: int | None = None,
+        mmr: bool = False,
+        mmr_lambda: float = .8,
+        mmr_candidate_k: int = 100,
     ) -> dict:
         """Full trace of one request, for the Recommendation Inspector page."""
         import time
@@ -305,8 +323,9 @@ class TwoStageRecommender:
             moved_up.sort(key=lambda e: -e["position_delta"])
             moved_down.sort(key=lambda e: -e["position_delta"])
 
-        rr = rerank(entries, RerankConfig(exploration=cold_exploration),
-                    final_k=20, history=set(hist))
+        rr = rerank(entries, RerankConfig(exploration=cold_exploration, mmr=mmr,
+                                          mmr_lambda=mmr_lambda, mmr_candidate_k=mmr_candidate_k),
+                    final_k=20, history=set(hist), content_embeddings=self.content_embeddings)
 
         merged.stats["exploration_in_pool"] = sum(
             1 for e in entries if e.get("exploration_candidate"))
