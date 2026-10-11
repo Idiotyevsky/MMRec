@@ -4,6 +4,7 @@ from .pipeline import CandidateMerger, MergeResult
 from .popular import PopularRecall
 from .semantic import SemanticRecall, build_content_embeddings
 from .two_tower import TwoTowerRecall, load_two_tower_recall
+from .swing import SwingRecall, build_swing_index, load_swing_recall
 
 __all__ = [
     "RecallStrategy",
@@ -20,4 +21,7 @@ __all__ = [
     "build_content_embeddings",
     "TwoTowerRecall",
     "load_two_tower_recall",
+    "SwingRecall",
+    "build_swing_index",
+    "load_swing_recall",
 ]

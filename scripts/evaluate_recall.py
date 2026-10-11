@@ -111,7 +111,10 @@ def precompute_generative(args, data: ProcessedData, users: np.ndarray):
 def build_merger(args, data: ProcessedData, users: np.ndarray | None = None) -> CandidateMerger:
     strategies = [PopularRecall(data.train_freq, data.num_items)]
     ic_path = ROOT / args.itemcf_index
-    if ic_path.exists():
+    if getattr(args, "collaborative_channel", "itemcf") == "swing":
+        from src.recall.swing import load_swing_recall
+        strategies.append(load_swing_recall(ROOT / args.swing_index, data))
+    elif ic_path.exists():
         ic = load_itemcf_index(ic_path)
         strategies.append(ItemCFRecall(ic["neighbors"], ic["sims"], data.num_items))
     else:
@@ -146,6 +149,8 @@ def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--processed-dir", default="data/processed/base")
     ap.add_argument("--itemcf-index", default="artifacts/itemcf_neighbors.npz")
+    ap.add_argument("--collaborative-channel", choices=("itemcf", "swing"), default="itemcf")
+    ap.add_argument("--swing-index", default="artifacts/swing_neighbors.npz")
     ap.add_argument("--content-embeddings", default="artifacts/content_embeddings.npy")
     ap.add_argument("--two-tower-run", default=None,
                     help="finished Two-Tower run directory containing best.pt and exported embeddings")

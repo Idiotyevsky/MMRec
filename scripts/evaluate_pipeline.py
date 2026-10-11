@@ -61,7 +61,10 @@ def user_subset_hash(users: np.ndarray) -> str:
 def build(args, data: ProcessedData):
     strategies = [PopularRecall(data.train_freq, data.num_items)]
     ic_path = ROOT / args.itemcf_index
-    if ic_path.exists():
+    if getattr(args, "collaborative_channel", "itemcf") == "swing":
+        from src.recall.swing import load_swing_recall
+        strategies.append(load_swing_recall(ROOT / args.swing_index, data))
+    elif ic_path.exists():
         ic = load_itemcf_index(ic_path)
         strategies.append(ItemCFRecall(ic["neighbors"], ic["sims"], data.num_items))
     else:
@@ -75,7 +78,7 @@ def build(args, data: ProcessedData):
         from src.recall.two_tower import load_two_tower_recall
         strategies.append(load_two_tower_recall(ROOT / args.two_tower_run, data,
                                                 device=args.two_tower_device))
-    merger = CandidateMerger(strategies)
+    merger = CandidateMerger(strategies, merge_method=args.merge_method)
 
     specs = {}
     for name in ("sasrec", "mm_concat"):
@@ -92,15 +95,20 @@ def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--processed-dir", default="data/processed/base")
     ap.add_argument("--itemcf-index", default="artifacts/itemcf_neighbors.npz")
+    ap.add_argument("--collaborative-channel", choices=("itemcf", "swing"), default="itemcf")
+    ap.add_argument("--swing-index", default="artifacts/swing_neighbors.npz")
     ap.add_argument("--content-embeddings", default="artifacts/content_embeddings.npy")
     ap.add_argument("--two-tower-run", default=None,
                     help="finished Two-Tower run; adds the learned retrieval channel")
     ap.add_argument("--two-tower-device", default="cpu")
     ap.add_argument("--sasrec-run", default=None, help="default: newest finished 'sasrec' run")
-    ap.add_argument("--mm-run", default=None, help="default: newest finished 'mm_concat' run")
+    ap.add_argument("--mm-run", dest="mm_concat_run", default=None,
+                    help="default: newest finished 'mm_concat' run")
     ap.add_argument("--ranker", default="mm_concat")
     ap.add_argument("--candidate-sizes", nargs="*", type=int, default=[100, 200, 500, 1000, 2000])
     ap.add_argument("--recall-k", type=int, default=1000, help="per-channel budget")
+    ap.add_argument("--merge-method", choices=("rrf", "snake"), default="rrf",
+                    help="candidate merge ordering; RRF is the serving default")
     ap.add_argument("--final-k", type=int, default=20)
     ap.add_argument("--max-users", type=int, default=10000)
     ap.add_argument("--eval-seed", type=int, default=42, help="seed for the user sample")
@@ -108,7 +116,12 @@ def main() -> None:
     ap.add_argument("--out", default="results/tables/pipeline_tradeoff.csv")
     ap.add_argument("--source-out", default="results/tables/recall_source_contribution.csv")
     ap.add_argument("--json-out", default="results/tables/pipeline_tradeoff.json")
+    ap.add_argument("--log-file", default=None, help="optional persistent progress log")
     args = ap.parse_args()
+
+    if args.log_file:
+        global LOG
+        LOG = get_logger("mmrec.evaluate_pipeline.file", Path(args.log_file))
 
     configure_threads()
     data = ProcessedData.load(ROOT / args.processed_dir)
@@ -164,6 +177,8 @@ def main() -> None:
 
         # ---- two-stage pipeline ----
         merged = merger.recall_and_merge(u, hist, per_source_k=args.recall_k, total_k=None)
+        if merged.stats.get("errors"):
+            raise RuntimeError(f"recall failed for user {u}: {merged.stats['errors']}")
         pool = merged.item_ids()
         for cand_k in args.candidate_sizes:
             st = per_size[cand_k]
@@ -213,10 +228,13 @@ def main() -> None:
             "mean_pool_size": float(st["pool"].mean()),
             "recall_sources": "+".join(merger.source_names),
             "per_source_k": args.recall_k,
+            "merge_method": args.merge_method,
         })
+        retention = rows[-1]["recall_retention"]
+        retention_label = f"{retention:.3f}" if retention is not None else "N/A"
         LOG.info(f"cand_k={cand_k:5d}: pool={st['pool'].mean():7.0f} "
                  f"cand_recall={st['cand_hit'].mean():.4f} "
-                 f"R@20={pipe_recall:.4f} (retention {pipe_recall/full_recall:.3f})")
+                 f"R@20={pipe_recall:.4f} (retention {retention_label})")
 
         total_hits = max(sum(st["contrib"].values()), 1)
         for name, c in st["contrib"].items():
@@ -248,8 +266,9 @@ def main() -> None:
     print(header)
     print("-" * len(header))
     for r in rows:
+        retention_label = f"{r['recall_retention']:.3f}" if r["recall_retention"] is not None else "N/A"
         print(f"{r['candidate_k']:>8d}{r['mean_pool_size']:>8.0f}{r['candidate_recall']:>13.4f}"
-              f"{r['pipeline_Recall@20']:>15.4f}{r['recall_retention']:>11.3f}")
+              f"{r['pipeline_Recall@20']:>15.4f}{retention_label:>11s}")
 
     print("\n=== which recall channel produced the final top-20 hits? ===")
     for r in source_rows:
@@ -266,6 +285,9 @@ def main() -> None:
         "user_subset_hash": uhash,
         "recall_k_per_channel": args.recall_k,
         "recall_sources": merger.source_names,
+        "merge_method": args.merge_method,
+        "snake_pattern": (merger.source_names + merger.source_names[-2:0:-1]
+                          if args.merge_method == "snake" else None),
         "final_k": args.final_k,
         "full_catalogue": {"Recall@20": full_recall, "NDCG@20": full_ndcg_mean},
         "tradeoff": rows,

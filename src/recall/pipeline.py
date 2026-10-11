@@ -1,22 +1,29 @@
 """Multi-channel recall + candidate merge.
 
-    popular  ─┐
-    itemcf   ─┼─►  merge / dedup / source trace  ─►  ranked candidate pool
-    semantic ─┼─► merge / dedup / source trace
-    two_tower┘
+    popular   ─┐
+    itemcf    ─┤
+    semantic  ─┼─► merge / dedup / source trace ─► ranked candidate pool
+    two_tower ─┘
 
 The merge step must not throw information away: the Recommendation Inspector
 shows *which* channel produced each candidate and at what rank, so every
 contributing channel is recorded on the merged candidate.
 
-Ranking the pool is done by **reciprocal rank fusion** (RRF)::
+The default ranks the pool by **reciprocal rank fusion** (RRF)::
 
     merge_score(j) = Σ_channels 1 / (k + rank_channel(j)),   k = 60
 
-RRF is used instead of summing raw scores because the three channels produce
+RRF is used instead of summing raw scores because the channels produce
 incomparable quantities — popularity counts (0..546), ItemCF similarity sums
 (0..10) and cosine similarities (-1..1).  RRF only depends on ranks, so no
 channel can dominate the pool just because its numbers are larger.
+
+For controlled offline comparison, ``merge_method="snake"`` uses a deterministic
+ping-pong interleave of channel ranks. For channels ``A,B,C,D`` its visits are
+``A,B,C,D,C,B,A,...``; every visit consumes that channel's next candidate and
+deduplicates globally. Interior channels get twice the visits of endpoints
+while all lists remain active; this is not equal-quota interleaving. It is an
+offline comparison baseline, not the serving default.
 """
 
 from __future__ import annotations
@@ -49,11 +56,15 @@ class CandidateMerger:
         self,
         strategies: Sequence[RecallStrategy],
         rrf_k: int = DEFAULT_RRF_K,
+        merge_method: str = "rrf",
     ) -> None:
         if not strategies:
             raise ValueError("at least one recall strategy is required")
         self.strategies = list(strategies)
         self.rrf_k = int(rrf_k)
+        self.merge_method = str(merge_method).lower()
+        if self.merge_method not in ("rrf", "snake"):
+            raise ValueError("merge_method must be 'rrf' or 'snake'")
 
     # ------------------------------------------------------------------
     @property
@@ -122,7 +133,32 @@ class CandidateMerger:
                 entry.sources.append(trace)
                 entry.merge_score += 1.0 / (self.rrf_k + c.rank)
 
-        ordered = sorted(merged.values(), key=lambda c: (-c.merge_score, c.item_id))
+        if self.merge_method == "rrf":
+            ordered = sorted(merged.values(), key=lambda c: (-c.merge_score, c.item_id))
+        else:
+            # A,B,C,D,C,B,A,... avoids repeating the endpoint channel at each
+            # turn. Interior channels get twice the visits of endpoints; this
+            # is an explicit property of this ping-pong variant, not equal quotas.
+            names = list(per_source)
+            traversal = names + names[-2:0:-1] if len(names) > 1 else names
+            cursors = {name: 0 for name in names}
+            used: set[int] = set()
+            ordered = []
+            while any(cursors[name] < len(per_source[name]) for name in names):
+                for name in traversal:
+                    pos = cursors[name]
+                    if pos >= len(per_source[name]):
+                        continue
+                    cursors[name] += 1
+                    item = per_source[name][pos].item_id
+                    if item in used:
+                        continue
+                    used.add(item)
+                    entry = merged[item]
+                    # Expose a monotonic presentation score without pretending
+                    # it is a cross-channel similarity or an RRF score.
+                    entry.merge_score = 1.0 / (len(ordered) + 1)
+                    ordered.append(entry)
         # how many items each channel is the *only* source for: the channel's
         # irreplaceable contribution to the pool, which is the honest way to read
         # a multi-channel recall setup
@@ -137,7 +173,10 @@ class CandidateMerger:
             "after_dedup": int(len(ordered)),
             "duplicates_removed": int(before - len(ordered)),
             "rrf_k": self.rrf_k,
+            "merge_method": self.merge_method,
         }
+        if self.merge_method == "snake":
+            stats["snake_pattern"] = list(per_source) + list(per_source)[-2:0:-1]
         if "_errors" in channel_results:
             stats["errors"] = channel_results["_errors"]  # type: ignore[assignment]
         return MergeResult(candidates=ordered, stats=stats)

@@ -51,6 +51,35 @@ def test_multi_source_items_rank_higher_under_rrf():
     assert res.candidates[0].item_id == 9, "an item found by both channels should win"
 
 
+def test_snake_interleaves_channels_and_deduplicates():
+    merger = CandidateMerger([
+        _Fixed("a", [1, 2, 3]), _Fixed("b", [4, 2, 5]),
+        _Fixed("c", [6, 7, 3]), _Fixed("d", [8, 9, 10]),
+    ], merge_method="snake")
+    res = merger.merge(merger.recall(1, [], per_source_k=3))
+    assert res.item_ids()[:9] == [1, 4, 6, 8, 7, 2, 5, 3, 9]
+    assert res.stats["merge_method"] == "snake"
+    assert res.stats["snake_pattern"] == ["a", "b", "c", "d", "c", "b"]
+    assert len(res.item_ids()) == len(set(res.item_ids())) == 10
+    repeated = next(c for c in res.candidates if c.item_id == 2)
+    assert {s["name"]: s["rank"] for s in repeated.sources} == {"a": 2, "b": 2}
+
+
+@pytest.mark.parametrize("method", ["rrf", "snake"])
+def test_merge_handles_exhaustion_and_preserves_trace_after_truncation(method):
+    merger = CandidateMerger([
+        _Fixed("a", [1, 2, 3]), _Fixed("b", []),
+        _Fixed("c", [1]), _Fixed("d", [4, 1]),
+    ], merge_method=method)
+    all_results = merger.recall_and_merge(1, [], per_source_k=5)
+    assert set(all_results.item_ids()) == {1, 2, 3, 4}
+    result = merger.recall_and_merge(1, [], per_source_k=5, total_k=2)
+    assert result.item_ids() == all_results.item_ids()[:2]
+    assert result.stats["candidates_ranked"] == 2
+    repeated = next(c for c in result.candidates if c.item_id == 1)
+    assert set(repeated.source_names) == {"a", "c", "d"}
+
+
 def test_rrf_ignores_raw_score_scale():
     """A channel with huge scores must not dominate one with tiny scores."""
 

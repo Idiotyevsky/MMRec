@@ -1,0 +1,20 @@
+{
+  "processed_dir": "data/processed/base",
+  "out": "artifacts/swing_neighbors.npz",
+  "report": "artifacts/swing_report.json",
+  "top_m": 100,
+  "alpha1": 5.0,
+  "alpha2": 1.0,
+  "beta": 0.3,
+  "chunk_size": 1024,
+  "dataset_hash": "71a1309e99c48ae9faf3d22bfc3aa081",
+  "num_items": 19738,
+  "num_users": 100000,
+  "build_time_s": 17.17697659879923,
+  "algorithm": "swing",
+  "contributing_user_pairs": 1207578,
+  "pairs_with_nonzero_similarity": 281454,
+  "mean_neighbours_per_item": 14.259499442699362,
+  "items_with_no_neighbour": 5690,
+  "note": "Exact train-only, binary interactions, unordered distinct user pairs; no sampling, no history caps, no item-popularity normalization."
+}

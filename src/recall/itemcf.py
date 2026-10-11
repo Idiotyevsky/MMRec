@@ -165,7 +165,9 @@ class ItemCFRecall(RecallStrategy):
         flat_scores = sim.ravel()
         valid = flat_items > PAD
         scores = np.bincount(flat_items[valid], weights=flat_scores[valid],
-                             minlength=self.num_items + 1)[: self.num_items + 1]
+                             minlength=self.num_items + 1)[: self.num_items + 1].astype(np.float64, copy=False)
+        # np.bincount returns integers for empty inputs even with weights.
+        # Keep masking with -inf valid for entirely unsupported histories.
         return scores
 
     def recall(self, user_id: int, history: Sequence[int], top_k: int) -> list[RecallCandidate]:
